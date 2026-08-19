@@ -1,4 +1,4 @@
-# FlashSeat — Event Ticketing Platform
+# AI-Powered Scalable Booking System — Event Ticketing Platform
 
 ## The Pitch
 

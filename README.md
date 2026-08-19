@@ -1,4 +1,4 @@
-# FlashSeat
+# AI-Powered Scalable Booking System
 
 A scalable event-ticketing backend (Postgres → Debezium → Kafka → Node/Fastify → Redis)
 built to demonstrate distributed-systems fundamentals: CDC-driven cache invalidation,
@@ -47,11 +47,11 @@ Then:
 curl http://localhost:3000/health
 
 # seed a venue/event/seat directly (no admin API yet)
-docker exec flashseat-postgres psql -U flashseat -d flashseat -c \
+docker exec booking-system-postgres psql -U booking_system -d booking_system -c \
   "INSERT INTO venues (name, city) VALUES ('Wankhede Stadium', 'Mumbai');"
-docker exec flashseat-postgres psql -U flashseat -d flashseat -c \
+docker exec booking-system-postgres psql -U booking_system -d booking_system -c \
   "INSERT INTO events (venue_id, name, starts_at) VALUES (1, 'IPL Final', now() + interval '7 days');"
-docker exec flashseat-postgres psql -U flashseat -d flashseat -c \
+docker exec booking-system-postgres psql -U booking_system -d booking_system -c \
   "INSERT INTO seats (event_id, section, row_label, seat_number) VALUES (1, 'A', '1', 1);"
 
 curl -X POST http://localhost:3000/bookings/reserve \

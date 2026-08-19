@@ -8,9 +8,9 @@ const envSchema = z.object({
   REDIS_URL: z.url(),
 
   KAFKA_BROKERS: z.string().min(1).transform((v) => v.split(",")),
-  KAFKA_CLIENT_ID: z.string().default("flashseat-backend"),
-  KAFKA_CDC_GROUP_ID: z.string().default("flashseat-cdc-consumer"),
-  KAFKA_CDC_TOPIC: z.string().default("flashseat.public.seats"),
+  KAFKA_CLIENT_ID: z.string().default("booking-system-backend"),
+  KAFKA_CDC_GROUP_ID: z.string().default("booking-system-cdc-consumer"),
+  KAFKA_CDC_TOPIC: z.string().default("booking-system.public.seats"),
 
   // Optional until auth is wired into routes — Clerk is vendored from
   // Scalable-Backend-System but not yet gating any endpoints here.

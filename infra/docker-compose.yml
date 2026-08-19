@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:16
-    container_name: flashseat-postgres
+    container_name: booking-system-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -22,7 +22,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: flashseat-redis
+    container_name: booking-system-redis
     restart: unless-stopped
     ports:
       - "${REDIS_PORT}:6379"
@@ -34,7 +34,7 @@ services:
 
   kafka:
     image: confluentinc/cp-kafka:7.6.1
-    container_name: flashseat-kafka
+    container_name: booking-system-kafka
     restart: unless-stopped
     ports:
       - "${KAFKA_PORT}:29092"
@@ -59,7 +59,7 @@ services:
 
   kafka-connect:
     image: quay.io/debezium/connect:2.7
-    container_name: flashseat-kafka-connect
+    container_name: booking-system-kafka-connect
     restart: unless-stopped
     depends_on:
       kafka:
@@ -70,7 +70,7 @@ services:
       - "${KAFKA_CONNECT_PORT}:8083"
     environment:
       BOOTSTRAP_SERVERS: kafka:9092
-      GROUP_ID: flashseat-connect
+      GROUP_ID: booking-system-connect
       CONFIG_STORAGE_TOPIC: connect-configs
       OFFSET_STORAGE_TOPIC: connect-offsets
       STATUS_STORAGE_TOPIC: connect-status
@@ -85,7 +85,7 @@ services:
 
   connect-init:
     image: curlimages/curl:8.10.1
-    container_name: flashseat-connect-init
+    container_name: booking-system-connect-init
     depends_on:
       kafka-connect:
         condition: service_healthy

@@ -1,4 +1,4 @@
-# FlashSeat — Project Context
+# AI-Powered Scalable Booking System — Project Context
 
 ## What This Is
 
@@ -24,7 +24,7 @@ Vraj has already built every component needed:
 
 3. **Scalable Backend System** — Node + Fastify + Drizzle + BullMQ + Redis + Clerk auth.
    DDD + Hexagonal architecture, 10 ADRs, rate limiting, DLQ monitoring, security headers.
-   Originally built on Bun; flashseat ports the same stack onto Node for a more
+   Originally built on Bun; this project ports the same stack onto Node for a more
    battle-tested runtime. Early stage — only users module built so far.
    Location: ~/Programming/Scalable-Backend-System/ (GitHub: VrajVed/Scalable-Backend-System)
 
@@ -45,7 +45,7 @@ but not a system. The gap is integration + deployment:
 ## The Merge Plan
 
 ### Phase 1 — Wire Kafka + CDC into the Backend
-- Move CDC pipeline's docker-compose (Postgres + Debezium + Kafka) into flashseat
+- Move CDC pipeline's docker-compose (Postgres + Debezium + Kafka) into this project
 - Add Kafka producer to backend: booking/payment events → Kafka topics
 - Add Kafka consumer: consume CDC events for Redis cache invalidation
 - Result: Postgres → Debezium → Kafka → Backend → Redis cache invalidation
