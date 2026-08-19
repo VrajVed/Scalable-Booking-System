@@ -6,9 +6,10 @@ working-in-this-repo instructions, not project background.
 ## What's here right now
 
 `idea.md` (the pitch + architecture), `context.md` (the full project context, what
-exists, what needs building), this file, and the initial scaffold: `backend/` (Node +
+exists, what needs building), this file, and the scaffold: `backend/` (Node +
 Fastify + TypeScript), `infra/` (Docker Compose + Debezium connector + Postgres init),
-`router-core/` (vendored Rust crate), `k8s/` and `docs/adr/` (empty, Phase 3+).
+`router-core/` (vendored Rust crate, library only), `lb-proxy/` (Rust reverse proxy
+wrapping router-core — Phase 2, done), `k8s/` and `docs/adr/` (empty, Phase 3+).
 
 This project merges three existing repos into one unified system:
 - CDC pipeline: ~/Programming/PracticePrograms/CDC_pipeline/
@@ -22,8 +23,9 @@ This project merges three existing repos into one unified system:
 - Backend dev server: `cd backend && npm install && npm run dev` (tsx watch)
 - Backend build/typecheck: `cd backend && npm run build`
 - Drizzle migrations: `cd backend && npm run db:generate` / `npm run db:migrate`
-- Rust LB: not yet wired into a runnable proxy — `router-core/` is a library crate only
-  (`cd router-core && cargo test`). The reverse-proxy binary is Phase 2.
+- Rust LB library: `cd router-core && cargo test`
+- Rust reverse proxy: `cd lb-proxy && BACKEND_POOL=http://localhost:3001,http://localhost:3002 cargo run`
+  (wraps router-core's P2C router; see lb-proxy/README.md for env vars)
 - k8s / load tests: not built yet (Phase 3/4)
 
 ## Architecture Decisions

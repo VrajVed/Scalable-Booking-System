@@ -2,14 +2,14 @@
 
 A scalable event-ticketing backend (Postgres → Debezium → Kafka → Node/Fastify → Redis)
 built to demonstrate distributed-systems fundamentals: CDC-driven cache invalidation,
-optimistic-concurrency seat reservation, and (eventually) a Rust P2C load balancer in
-front of multiple backend instances. See `idea.md` for the pitch and `context.md` for
-full background — this file is just "how do I run it."
+optimistic-concurrency seat reservation, and a Rust P2C load balancer in front of
+multiple backend instances. See `idea.md` for the pitch and `context.md` for full
+background — this file is just "how do I run it."
 
 ## Status
 
-Phase 1 (Kafka + CDC wired into the backend) is done and tested end-to-end. Phase 2
-(Rust reverse-proxy LB), Phase 3 (k8s), and Phase 4 (load testing) are not built yet.
+Phase 1 (Kafka + CDC wired into the backend) and Phase 2 (Rust reverse-proxy LB) are
+done and tested end-to-end. Phase 3 (k8s) and Phase 4 (load testing) are not built yet.
 
 ## What's here
 
@@ -19,8 +19,11 @@ Phase 1 (Kafka + CDC wired into the backend) is done and tested end-to-end. Phas
   Booking module with an optimistic-concurrency seat reservation flow, a Kafka
   producer for `booking.events`, and a Kafka consumer that maps Debezium's CDC
   envelope on the `seats` table to Redis cache invalidation — zero polling.
-- `router-core/` — vendored Rust crate (P2C routing + ArcSwap scoreboard + safety
-  overrides), 15 passing tests. Not yet wrapped in a runnable reverse proxy.
+- `router-core/` — vendored Rust library crate (P2C routing + ArcSwap scoreboard +
+  safety overrides), 15 passing tests.
+- `lb-proxy/` — Rust reverse proxy wrapping router-core: routes each request via
+  P2C, feeds real latency/5xx/in-flight signals back into the scoreboard. 4 passing
+  integration tests (real sockets, fake backends). See `lb-proxy/README.md`.
 - `k8s/`, `docs/adr/` — empty, later phases.
 
 ## Running it
@@ -66,9 +69,13 @@ line firing without any polling loop is the whole point of the CDC pipeline.
 ## Rust load balancer
 
 ```bash
-cd router-core && cargo test
+cd router-core && cargo test   # the P2C/scoreboard library, 15 tests
+
+cd lb-proxy
+BACKEND_POOL=http://localhost:3000 cargo run   # proxy in front of the backend
+cargo test                                     # 4 integration tests
 ```
 
-Library only for now — no reverse-proxy binary yet, so nothing to run against
-traffic. The ML layer from the source repo was intentionally left out; see
+See `lb-proxy/README.md` for env vars and how the routing/feedback loop works. The
+ML layer from the source repo was intentionally left out of both crates; see
 `CLAUDE.md` for why.
