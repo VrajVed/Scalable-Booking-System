@@ -1,0 +1,14 @@
+[package]
+name = "router-core"
+version = "0.1.0"
+edition = "2021"
+description = "Predictive load balancer: lock-free scoreboard and P2C router"
+
+[dependencies]
+# ArcSwap provides wait-free reads via atomic pointer swap (RCU pattern).
+# This is the single most critical dependency: it enables < 1 µs routing decisions
+# while the inference engine can update scores concurrently.
+arc-swap = "1"
+
+[dev-dependencies]
+# No extra dev dependencies — tests use only std.
