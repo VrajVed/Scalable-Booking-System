@@ -41,6 +41,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await
         .map_err(|e| format!("failed to bind {}: {e}", cfg.listen_addr))?;
 
-    proxy::run(listener, state).await;
+    proxy::run_until(listener, state, shutdown_signal()).await;
     Ok(())
+}
+
+/// Resolves on Ctrl-C or SIGTERM (the signal Kubernetes sends a pod during
+/// termination — rolling updates, scale-down, node drain — before waiting
+/// `terminationGracePeriodSeconds` and then SIGKILLing it). Wired into
+/// `proxy::run_until` so the proxy stops accepting new connections and
+/// drains in-flight ones instead of dying mid-request.
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        if let Err(e) = tokio::signal::ctrl_c().await {
+            eprintln!("[lb-proxy] failed to install Ctrl-C handler: {e}");
+        }
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut sig) => {
+                sig.recv().await;
+            }
+            Err(e) => eprintln!("[lb-proxy] failed to install SIGTERM handler: {e}"),
+        }
+    };
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {}
+        _ = terminate => {}
+    }
 }

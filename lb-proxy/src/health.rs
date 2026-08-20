@@ -152,3 +152,147 @@ impl Default for ServerHealth {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Arc;
+
+    /// Fire many concurrent `record()` calls from real parallel tokio tasks
+    /// (not sequential awaits) and confirm every completion is accounted for
+    /// exactly once. `total_requests` is a plain atomic fetch_add so it must
+    /// match the call count exactly; if the sliding-window deques lost
+    /// updates under contention, `all_requests` length (post-prune, but we
+    /// use a window bigger than the whole test so nothing prunes) would also
+    /// undercount.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
+    async fn concurrent_record_has_no_lost_updates() {
+        let health = Arc::new(ServerHealth::new());
+        let window = Duration::from_secs(60); // long enough nothing prunes mid-test
+        let tasks_n = 50;
+        let per_task = 200;
+
+        let mut handles = Vec::new();
+        for i in 0..tasks_n {
+            let h = health.clone();
+            handles.push(tokio::spawn(async move {
+                for j in 0..per_task {
+                    // Mix of ok/error statuses so both deques get contended.
+                    let status = if (i + j) % 7 == 0 {
+                        StatusCode::INTERNAL_SERVER_ERROR
+                    } else {
+                        StatusCode::OK
+                    };
+                    h.record(status, Duration::from_micros(1), window);
+                }
+            }));
+        }
+        for h in handles {
+            h.await.unwrap();
+        }
+
+        let expected = tasks_n * per_task;
+        assert_eq!(
+            health.total_requests(),
+            expected as u64,
+            "lost updates under concurrent record()"
+        );
+
+        // Sliding window count (nothing pruned: window is huge) must match too.
+        let all_count = {
+            let mut all = health.all_requests.lock().unwrap();
+            prune(&mut all, Instant::now(), window);
+            all.len()
+        };
+        assert_eq!(all_count, expected, "all_requests deque lost entries under contention");
+
+        // Expected 5xx count: for i in 0..50, j in 0..200, (i+j)%7==0.
+        let mut expected_5xx = 0u64;
+        for i in 0..tasks_n {
+            for j in 0..per_task {
+                if (i + j) % 7 == 0 {
+                    expected_5xx += 1;
+                }
+            }
+        }
+        assert_eq!(health.five_xx_count(window), expected_5xx);
+    }
+
+    /// Concurrent `record()` + `snapshot()` + `begin`/`decrement` from many
+    /// tasks at once must not panic or deadlock, and in_flight must return to
+    /// exactly zero once every task's begin() is matched by a decrement().
+    #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
+    async fn concurrent_mixed_access_no_panic_balanced_in_flight() {
+        let health = Arc::new(ServerHealth::new());
+        let window = Duration::from_millis(50);
+
+        let mut handles = Vec::new();
+        for _ in 0..64 {
+            let h = health.clone();
+            handles.push(tokio::spawn(async move {
+                h.begin();
+                let _ = h.snapshot(window);
+                h.record(StatusCode::OK, Duration::from_micros(5), window);
+                let _ = h.error_rate(window);
+                h.decrement();
+            }));
+        }
+        for h in handles {
+            h.await.unwrap();
+        }
+
+        assert_eq!(
+            health.snapshot(window).in_flight,
+            0,
+            "in_flight must balance back to zero after matched begin/decrement pairs"
+        );
+    }
+
+    /// The sliding window is inclusive at the boundary: `prune` only drops
+    /// entries strictly older than `window` (`duration_since(oldest) <=
+    /// window` is kept). We can't control `Instant::now()` directly, so we
+    /// approximate the boundary with real sleeps: shortly before `window`
+    /// elapses the event must still be counted, and comfortably after it
+    /// must be gone. This nails down the *direction* of the boundary
+    /// (inclusive-recent, not the reverse) without relying on exact timing.
+    #[tokio::test]
+    async fn sliding_window_expires_after_window_elapses() {
+        let health = ServerHealth::new();
+        let window = Duration::from_millis(120);
+
+        health.record(StatusCode::INTERNAL_SERVER_ERROR, Duration::from_micros(1), window);
+        assert_eq!(health.five_xx_count(window), 1, "event must count immediately after recording");
+
+        tokio::time::sleep(Duration::from_millis(40)).await;
+        assert_eq!(
+            health.five_xx_count(window),
+            1,
+            "event well within the window must still be counted"
+        );
+
+        tokio::time::sleep(Duration::from_millis(140)).await; // total ~180ms > 120ms window
+        assert_eq!(
+            health.five_xx_count(window),
+            0,
+            "event older than the window must be pruned"
+        );
+    }
+
+    #[test]
+    fn error_rate_is_zero_with_no_requests() {
+        let health = ServerHealth::new();
+        assert_eq!(health.error_rate(Duration::from_secs(10)), 0.0);
+    }
+
+    #[test]
+    fn error_rate_reflects_ratio_of_5xx_to_total() {
+        let health = ServerHealth::new();
+        let window = Duration::from_secs(10);
+        // 3 ok, 1 error => 25% error rate.
+        health.record(StatusCode::OK, Duration::from_micros(1), window);
+        health.record(StatusCode::OK, Duration::from_micros(1), window);
+        health.record(StatusCode::OK, Duration::from_micros(1), window);
+        health.record(StatusCode::INTERNAL_SERVER_ERROR, Duration::from_micros(1), window);
+        assert!((health.error_rate(window) - 0.25).abs() < 1e-9);
+    }
+}

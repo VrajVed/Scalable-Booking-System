@@ -9,7 +9,7 @@ license = "MIT"
 router-core = { path = "../router-core" }
 tokio = { version = "1", features = ["full"] }
 hyper = { version = "1", features = ["client", "http1", "http2", "server"] }
-hyper-util = { version = "0.1", features = ["client-legacy", "http1", "http2", "tokio"] }
+hyper-util = { version = "0.1", features = ["client-legacy", "http1", "http2", "tokio", "server-graceful"] }
 http = "1"
 http-body = "1"
 http-body-util = "0.1"
