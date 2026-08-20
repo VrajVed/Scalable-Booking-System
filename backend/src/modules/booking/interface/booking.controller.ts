@@ -4,11 +4,12 @@ import { reserveSeat } from "../application/reserve-seat.usecase.js";
 
 const reserveSeatSchema = z.object({
   seatId: z.coerce.number().int().positive(),
-  userId: z.string().min(1),
 });
 
 export async function reserveSeatHandler(request: FastifyRequest, reply: FastifyReply) {
-  const body = reserveSeatSchema.parse(request.body);
-  const booking = await reserveSeat(body);
+  const { seatId } = reserveSeatSchema.parse(request.body);
+  // requireAuth (a preHandler on this route) is what guarantees userId is
+  // set here -- see booking.routes.ts.
+  const booking = await reserveSeat({ seatId, userId: request.userId! });
   return reply.status(201).send({ success: true, booking });
 }

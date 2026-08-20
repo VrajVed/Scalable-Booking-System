@@ -1,4 +1,4 @@
-import { integer, pgTable, serial, text, timestamp, unique } from "drizzle-orm/pg-core";
+import { index, integer, pgTable, serial, text, timestamp, unique } from "drizzle-orm/pg-core";
 import { events } from "./events.js";
 
 // version supports optimistic-concurrency reservation: UPDATE ... WHERE
@@ -20,5 +20,10 @@ export const seats = pgTable(
     version: integer("version").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [unique().on(table.eventId, table.section, table.rowLabel, table.seatNumber)],
+  (table) => [
+    unique().on(table.eventId, table.section, table.rowLabel, table.seatNumber),
+    // matches infra/postgres/init.sql: idx_seats_event_status — the hot
+    // lookup path for the booking flow (find seats by event + status).
+    index("idx_seats_event_status").on(table.eventId, table.status),
+  ],
 );

@@ -11,19 +11,24 @@
     "start": "node --env-file=.env dist/index.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:baseline": "tsx --env-file=.env scripts/baseline-migrations.ts",
+    "db:seed": "tsx --env-file=.env scripts/seed.ts",
     "db:studio": "drizzle-kit studio",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "tsx --env-file=.env --test test/**/*.test.ts"
   },
   "dependencies": {
-    "@clerk/backend": "^3.2.0",
+    "bullmq": "^6.1.2",
     "drizzle-orm": "^0.45.1",
     "fastify": "^5.8.2",
     "ioredis": "^5.10.0",
+    "jsonwebtoken": "^9.0.3",
     "kafkajs": "^2.2.4",
     "postgres": "^3.4.8",
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.0.0",
     "drizzle-kit": "^0.31.9",
     "eslint": "^9.0.0",

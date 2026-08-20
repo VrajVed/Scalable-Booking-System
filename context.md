@@ -81,7 +81,7 @@ but not a system. The gap is integration + deployment:
 | Message Broker | Apache Kafka (KRaft mode) |
 | Cache | Redis |
 | Job Queue | BullMQ |
-| Auth | Clerk |
+| Auth | Local JWT (node:crypto scrypt + jsonwebtoken, ADR 0002) |
 | Container Orchestration | Kubernetes |
 | Cloud | AWS EKS or GCP GKE (TBD) |
 | Load Testing | autocannon |

@@ -22,7 +22,11 @@ This project merges three existing repos into one unified system:
   Kafka Connect/Debezium + Redis; connector auto-registers via `connect-init`)
 - Backend dev server: `cd backend && npm install && npm run dev` (tsx watch)
 - Backend build/typecheck: `cd backend && npm run build`
-- Drizzle migrations: `cd backend && npm run db:generate` / `npm run db:migrate`
+- Drizzle migrations: `cd backend && npm run db:generate` / `npm run db:migrate`.
+  After a fresh `docker compose up`, init.sql has already created the tables, so run
+  `npm run db:baseline` once first (marks the baseline migration as applied; otherwise
+  `db:migrate` fails with "relation already exists"). On an empty DB with no init.sql,
+  `db:migrate` alone creates the whole schema.
 - Rust LB library: `cd router-core && cargo test`
 - Rust reverse proxy: `cd lb-proxy && BACKEND_POOL=http://localhost:3001,http://localhost:3002 cargo run`
   (wraps router-core's P2C router; see lb-proxy/README.md for env vars)
@@ -41,8 +45,18 @@ safety overrides stand on their own as a legitimate intelligent load balancer.
 Node was chosen over Bun for its longer production track record (Bun is younger,
 written in Zig — fine for a portfolio piece but Node's Node API compat is more
 battle-tested). Keep the rest of the Scalable-Backend-System stack: DDD + Hexagonal
-vertical slices, Drizzle ORM, BullMQ for background jobs, Clerk for auth, Redis for
-cache + rate limiting. Dev loop runs on `tsx --watch` instead of `bun --watch`.
+vertical slices, Drizzle ORM, BullMQ for background jobs, Redis for cache + rate
+limiting. Dev loop runs on `tsx --watch` instead of `bun --watch`.
+
+### Auth — local JWT, not Clerk (ADR 0002)
+Clerk was the original plan but was replaced before being wired into any route.
+`users` table (email + `node:crypto` scrypt password hash), `POST /auth/register` /
+`POST /auth/login` issue a short-lived JWT, `requireAuth` preHandler verifies
+`Authorization: Bearer` on protected routes. Stateless by design: any backend pod
+verifies a token with just `JWT_SECRET`, no shared session store — this matters
+because the P2C load balancer routes each request independently, and sticky
+sessions would fight that. userId always comes from the verified token, never a
+request body field. See docs/adr/0002-jwt-auth-instead-of-clerk.md.
 
 ### CDC — Postgres WAL → Debezium → Kafka
 Reuse the CDC pipeline's docker-compose, connector config, and init.sql directly.

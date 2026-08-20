@@ -12,6 +12,11 @@ export function isProducerConnected(): boolean {
   return connected;
 }
 
+export async function disconnectProducer(): Promise<void> {
+  await producer.disconnect();
+  connected = false;
+}
+
 export async function publishBookingEvent(
   eventType: "booking.created" | "booking.confirmed" | "booking.cancelled",
   payload: Record<string, unknown>,
