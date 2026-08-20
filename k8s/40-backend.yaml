@@ -1,0 +1,206 @@
+# Backend: StatefulSet + headless Service. Design rationale (see
+# docs/adr/0001-k8s-headless-backend-service.md): lb-proxy's whole point is P2C
+# routing between INDIVIDUALLY addressable backends with per-backend health
+# tracking. A normal Service VIP would hide individual pods and defeat Phase 2's
+# work. The headless Service gives each pod a stable DNS name
+# (`booking-backend-0.booking-backend-headless.default.svc.cluster.local:3000`,
+# `-1`, `-2`, ...) that lb-proxy's BACKEND_POOL can list statically.
+#
+# Env matches backend/.env.example, pointed at in-cluster Service DNS names.
+# KAFKA_CDC_GROUP_ID is suffixed with the pod name so every replica consumes
+# the full CDC stream and invalidates cache — a shared group would partition
+# the topic to a single pod.
+#
+# An init container waits for Kafka/Postgres to be reachable: the backend
+# awaits connectProducer()/startCdcConsumer() before listening and exits if
+# they fail, so without the wait it would CrashLoopBackOff until Kafka is up.
+---
+# Local-dev demo secret (ADR 0002), same posture as postgres-credentials in
+# 00-postgres.yaml -- not production credential handling.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: backend-jwt-secret
+type: Opaque
+stringData:
+  JWT_SECRET: "kind-cluster-dev-only-secret-do-not-use-in-prod-32chars-min"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: booking-backend-headless
+spec:
+  clusterIP: None
+  selector:
+    app: booking-backend
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: booking-backend
+spec:
+  serviceName: booking-backend-headless
+  replicas: 3
+  selector:
+    matchLabels:
+      app: booking-backend
+  template:
+    metadata:
+      labels:
+        app: booking-backend
+    spec:
+      # See k8s/10-kafka.yaml for why: avoids k8s auto-injecting legacy
+      # SVCNAME_PORT-style env vars that could collide with app config.
+      enableServiceLinks: false
+      # backend/Dockerfile already creates and switches to the non-root
+      # `node` user (uid/gid 1000 in node:22-alpine) for the runtime image;
+      # this makes that explicit/enforced at the pod level too instead of
+      # relying solely on the image not being overridden. Applies to the
+      # init container as well since it shares this image.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+      initContainers:
+        - name: wait-for-deps
+          image: booking-backend:local
+          command:
+            - node
+            - -e
+            - |
+              const net = require("net");
+              const deps = [["kafka", 9092], ["postgres", 5432]];
+              (async () => {
+                for (const [host, port] of deps) {
+                  for (;;) {
+                    try {
+                      await new Promise((resolve, reject) => {
+                        const s = net.connect(port, host, () => { s.destroy(); resolve(); });
+                        s.on("error", () => { s.destroy(); reject(new Error("conn refused")); });
+                        s.setTimeout(2000, () => { s.destroy(); reject(new Error("timeout")); });
+                      });
+                      console.log(`${host}:${port} ready`);
+                      break;
+                    } catch { await new Promise(r => setTimeout(r, 2000)); }
+                  }
+                }
+                console.log("all dependencies ready");
+              })();
+      containers:
+        - name: backend
+          image: booking-backend:local
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "3000"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_DB
+            - name: DATABASE_URL
+              value: "postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)"
+            - name: REDIS_URL
+              value: "redis://redis:6379"
+            - name: KAFKA_BROKERS
+              value: "kafka:9092"
+            - name: KAFKA_CLIENT_ID
+              value: "booking-system-backend"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: KAFKA_CDC_GROUP_ID
+              value: "booking-system-cdc-consumer-$(POD_NAME)"
+            - name: KAFKA_CDC_TOPIC
+              value: "booking-system.public.seats"
+            - name: TRUST_PROXY_ADDRESSES
+              # Ticket 0002 trust boundary: lb-proxy is the ONLY hop before
+              # this backend (headless Service = direct pod-to-pod TCP, no
+              # SNAT), so the backend names the addresses it will accept
+              # X-Forwarded-For from. "loopback" covers kubectl port-forward
+              # (client appears as 127.0.0.1 at lb-proxy); the pod CIDR
+              # covers lb-proxy's pod IP (kind default 10.244.0.0/16). The
+              # rate limiter keys on request.ip, which Fastify derives from
+              # the chain only when the direct peer matches this list.
+              value: "loopback,10.244.0.0/16"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: backend-jwt-secret
+                  key: JWT_SECRET
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+# NOTE on maxReplicas: lb-proxy's BACKEND_POOL (k8s/50-lb-proxy.yaml) is a
+# static, fixed list of exactly 3 pod DNS names
+# (booking-backend-0/1/2.booking-backend-headless...), parsed once from the
+# env var at lb-proxy startup (see lb-proxy/src/config.rs — no re-read, no
+# watch, no dynamic Endpoints discovery). If this HPA scaled the StatefulSet
+# past 3, the new pods (booking-backend-3, -4, ...) would come up healthy
+# but receive zero traffic — lb-proxy has no way to learn they exist. maxReplicas
+# is capped at 3 to match reality instead of advertising autoscaling that
+# doesn't do anything. Raising it requires first teaching lb-proxy to
+# discover backends dynamically (e.g. watching the headless Service's
+# Endpoints/EndpointSlice) — out of scope here.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: booking-backend
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name: booking-backend
+  minReplicas: 3
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300

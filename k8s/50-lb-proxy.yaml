@@ -1,0 +1,89 @@
+# lb-proxy: the Rust P2C reverse proxy (router-core) in front of the backend.
+# BACKEND_POOL addresses each backend pod individually over the headless
+# Service from 40-backend.yaml — per-backend health tracking and P2C routing
+# are meaningless behind a single Service VIP, so the pool is the explicit,
+# fixed list of StatefulSet pod DNS names.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lb-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lb-proxy
+  template:
+    metadata:
+      labels:
+        app: lb-proxy
+    spec:
+      # See k8s/10-kafka.yaml for why: avoids k8s auto-injecting legacy
+      # SVCNAME_PORT-style env vars that could collide with app config.
+      enableServiceLinks: false
+      # lb-proxy/Dockerfile already creates and switches to the non-root
+      # `lbproxy` system user (uid/gid 999 in debian:bookworm-slim) for the
+      # runtime image; this makes that explicit/enforced at the pod level
+      # too instead of relying solely on the image not being overridden.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+      containers:
+        - name: lb-proxy
+          image: booking-lb-proxy:local
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: BACKEND_POOL
+              value: "http://booking-backend-0.booking-backend-headless.default.svc.cluster.local:3000,http://booking-backend-1.booking-backend-headless.default.svc.cluster.local:3000,http://booking-backend-2.booking-backend-headless.default.svc.cluster.local:3000"
+            - name: LISTEN_ADDR
+              value: "0.0.0.0:8080"
+            - name: LATENCY_SLO_MS
+              value: "1000"
+            - name: FIVE_XX_WINDOW_SECS
+              value: "10"
+            - name: HEALTH_POLL_MS
+              value: "500"
+            - name: MAX_BACKLOG
+              value: "100"
+            - name: MAX_5XX_COUNT
+              value: "10"
+            - name: MAX_IN_FLIGHT
+              value: "500"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lb-proxy
+spec:
+  selector:
+    app: lb-proxy
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

@@ -1,0 +1,188 @@
+# Postgres 16 with logical replication (wal_level=logical) for Debezium CDC.
+# Byte-for-byte equivalent of infra/docker-compose.yml + infra/postgres/*:
+# - init.sql from infra/postgres/init.sql mounted at /docker-entrypoint-initdb.d/
+# - postgresql.conf from infra/postgres/postgresql.conf mounted and pointed to via
+#   `postgres -c config_file=...`, exactly like the compose `command:`.
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-credentials
+type: Opaque
+stringData:
+  POSTGRES_USER: "booking_system"
+  POSTGRES_PASSWORD: "booking_system"
+  POSTGRES_DB: "booking_system"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config
+data:
+  init.sql: |
+    -- Runs once via /docker-entrypoint-initdb.d/ on first container start.
+    -- REPLICA IDENTITY FULL on seats is required so Debezium can emit the full
+    -- "before" image on UPDATE/DELETE (the default identity only includes the
+    -- PK) — the cache-invalidation consumer needs the old status to reason about
+    -- what changed.
+
+    CREATE TABLE IF NOT EXISTS venues (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      city TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS events (
+      id SERIAL PRIMARY KEY,
+      venue_id INTEGER NOT NULL REFERENCES venues(id),
+      name TEXT NOT NULL,
+      starts_at TIMESTAMPTZ NOT NULL,
+      status TEXT NOT NULL DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'cancelled', 'completed')),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS seats (
+      id SERIAL PRIMARY KEY,
+      event_id INTEGER NOT NULL REFERENCES events(id),
+      section TEXT NOT NULL,
+      row_label TEXT NOT NULL,
+      seat_number INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'available' CHECK (status IN ('available', 'held', 'booked')),
+      version INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (event_id, section, row_label, seat_number)
+    );
+
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS bookings (
+      id SERIAL PRIMARY KEY,
+      seat_id INTEGER NOT NULL REFERENCES seats(id),
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'cancelled', 'expired')),
+      hold_expires_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    ALTER TABLE seats REPLICA IDENTITY FULL;
+
+    CREATE INDEX IF NOT EXISTS idx_seats_event_status ON seats(event_id, status);
+    CREATE INDEX IF NOT EXISTS idx_bookings_seat ON bookings(seat_id);
+  postgresql.conf: |
+    # Minimal overrides required for Debezium's logical decoding (pgoutput plugin).
+    # Mounted over the default postgresql.conf via docker-entrypoint + `-c config_file=`.
+    listen_addresses = '*'
+    wal_level = logical
+    max_wal_senders = 4
+    max_replication_slots = 4
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      # See k8s/10-kafka.yaml for why: avoids k8s auto-injecting legacy
+      # SVCNAME_PORT-style env vars that could collide with app config.
+      enableServiceLinks: false
+      containers:
+        - name: postgres
+          image: postgres:16
+          # NOTE: this must be `args`, not `command`. In a Pod spec, `command`
+          # overrides the image's Docker ENTRYPOINT (postgres:16's is
+          # docker-entrypoint.sh, which does required setup — including
+          # dropping from root to the postgres user — before exec'ing the
+          # real `postgres` process). `args` overrides CMD instead, leaving
+          # ENTRYPOINT intact and passing these as its arguments, which is
+          # exactly how the image expects to be parameterized. (Docker
+          # Compose's `command:` maps to CMD, not ENTRYPOINT, which is why
+          # the identical-looking directive in infra/docker-compose.yml works
+          # and this one — as `command:` — crash-loops with "root execution
+          # of the PostgreSQL server is not permitted".)
+          args: ["-c", "config_file=/etc/postgresql/postgresql.conf"]
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_DB
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+            - name: postgres-config
+              mountPath: /docker-entrypoint-initdb.d/init.sql
+              subPath: init.sql
+              readOnly: true
+            - name: postgres-config
+              mountPath: /etc/postgresql/postgresql.conf
+              subPath: postgresql.conf
+              readOnly: true
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "booking_system", "-d", "booking_system"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "booking_system", "-d", "booking_system"]
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+      volumes:
+        - name: postgres-config
+          configMap:
+            name: postgres-config
+  volumeClaimTemplates:
+    - metadata:
+        name: pgdata
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  selector:
+    app: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres

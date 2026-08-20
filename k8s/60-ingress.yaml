@@ -1,0 +1,22 @@
+# Nginx ingress routing external traffic to the Rust lb-proxy, which then
+# P2C-routes to the individual backend pods. Requires an nginx ingress
+# controller in the cluster (see k8s/README.md — `booking.local` maps to the
+# controller on host port 80 via k8s/kind-config.yaml).
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: booking-ingress
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: booking.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: lb-proxy
+                port:
+                  number: 8080

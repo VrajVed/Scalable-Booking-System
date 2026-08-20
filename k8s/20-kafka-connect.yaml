@@ -1,0 +1,235 @@
+# Kafka Connect + Debezium, mirroring infra/docker-compose.yml's kafka-connect
+# service. The connector files under infra/connector/ are reused verbatim via a
+# ConfigMap, and a one-shot Job runs the same register-connector.sh that
+# docker compose's connect-init container runs. Job restartPolicy OnFailure
+# retries until Kafka Connect is up (compose's `depends_on: condition:
+# service_healthy` equivalent).
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: connector-files
+data:
+  postgres-connector.json: |
+    {
+      "name": "booking-system-connector",
+      "config": {
+        "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+        "database.hostname": "postgres",
+        "database.port": "5432",
+        "database.user": "__DB_USER__",
+        "database.password": "__DB_PASSWORD__",
+        "database.dbname": "__DB_NAME__",
+        "topic.prefix": "booking-system",
+        "table.include.list": "public.seats",
+        "plugin.name": "pgoutput",
+        "snapshot.mode": "initial",
+        "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+        "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+        "key.converter.schemas.enable": "false",
+        "value.converter.schemas.enable": "false"
+      }
+    }
+  register-connector.sh: |
+    #!/bin/sh
+    # Waits for Kafka Connect's REST API, then registers the Debezium Postgres
+    # connector so `docker compose up` requires zero manual setup steps.
+    #
+    # The connector config template in this same ConfigMap uses __DB_USER__ /
+    # __DB_PASSWORD__ / __DB_NAME__ placeholders instead of literal
+    # credentials, so this Job's Postgres creds come from the SAME
+    # `postgres-credentials` Secret that 00-postgres.yaml and 40-backend.yaml
+    # use (via secretKeyRef -> DB_USER/DB_PASSWORD/DB_NAME env vars below).
+    # Previously the JSON hardcoded "booking_system"/"booking_system"
+    # directly, which happened to match the Secret's dev values but would
+    # silently drift the moment the Secret's password changed.
+    set -eu
+
+    CONNECT_URL="http://kafka-connect:8083"
+
+    echo "Waiting for Kafka Connect at ${CONNECT_URL}..."
+    until curl -sf "${CONNECT_URL}/connectors" >/dev/null; do
+      sleep 2
+    done
+
+    echo "Kafka Connect is up. Substituting credentials from Secret and registering connector..."
+
+    # Substitute the credential placeholders with the real values from the
+    # environment. Done in awk (ENVIRON + index/substr string ops, byte-faithful,
+    # no metacharacter interpretation at any layer) because sed replacement text
+    # interprets '&', '\', and its delimiter: a password containing a literal
+    # '\' or '"' (valid in a Postgres password) produced invalid JSON through a
+    # sed pipeline when tested live inside this container image (busybox sed's
+    # [\&@] bracket class fails to match a literal backslash). Values are
+    # JSON-string-escaped before insertion so any character round-trips exactly.
+    # Mirrors the compose path (infra/connector/register-connector.sh): same
+    # __DB_USER__ / __DB_PASSWORD__ / __DB_NAME__ placeholders, same env-sourced
+    # values (here from the postgres-credentials Secret via DB_USER/DB_PASSWORD/
+    # DB_NAME).
+    awk '
+      {
+        t = t $0 "\n"
+      }
+      END {
+        user = ENVIRON["DB_USER"]
+        pass = ENVIRON["DB_PASSWORD"]
+        db = ENVIRON["DB_NAME"]
+        t = replace(t, "__DB_USER__", jsonescape(user))
+        t = replace(t, "__DB_PASSWORD__", jsonescape(pass))
+        t = replace(t, "__DB_NAME__", jsonescape(db))
+        printf "%s", t
+      }
+      function jsonescape(s,   out, n, i, c) {
+        out = ""
+        n = length(s)
+        for (i = 1; i <= n; i++) {
+          c = substr(s, i, 1)
+          if (c == "\\")  out = out "\\\\"
+          else if (c == "\"") out = out "\\\""
+          else if (c == "\n") out = out "\\n"
+          else if (c == "\t") out = out "\\t"
+          else if (c == "\r") out = out "\\r"
+          else if (c == "\b") out = out "\\b"
+          else if (c == "\f") out = out "\\f"
+          else out = out c
+        }
+        return out
+      }
+      function replace(s, ph, val,   i, out) {
+        while ((i = index(s, ph)) > 0) {
+          out = out substr(s, 1, i - 1) val
+          s = substr(s, i + length(ph))
+        }
+        return out s
+      }
+    ' /connector/postgres-connector.json > /tmp/postgres-connector.json
+
+    status=$(curl -s -o /tmp/register-response.json -w '%{http_code}' \
+      -X POST "${CONNECT_URL}/connectors" \
+      -H 'Content-Type: application/json' \
+      -d @/tmp/postgres-connector.json)
+
+    if [ "$status" = "201" ] || [ "$status" = "409" ]; then
+      echo "Connector registered (or already exists). HTTP $status"
+      cat /tmp/register-response.json
+      exit 0
+    fi
+
+    echo "Failed to register connector. HTTP $status"
+    cat /tmp/register-response.json
+    exit 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-connect
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka-connect
+  template:
+    metadata:
+      labels:
+        app: kafka-connect
+    spec:
+      # See k8s/10-kafka.yaml for why: avoids k8s auto-injecting legacy
+      # SVCNAME_PORT-style env vars that could collide with app config.
+      enableServiceLinks: false
+      containers:
+        - name: kafka-connect
+          image: quay.io/debezium/connect:2.7
+          ports:
+            - name: rest
+              containerPort: 8083
+          env:
+            - name: BOOTSTRAP_SERVERS
+              value: "kafka:9092"
+            - name: GROUP_ID
+              value: "booking-system-connect"
+            - name: CONFIG_STORAGE_TOPIC
+              value: "connect-configs"
+            - name: OFFSET_STORAGE_TOPIC
+              value: "connect-offsets"
+            - name: STATUS_STORAGE_TOPIC
+              value: "connect-status"
+            - name: CONFIG_STORAGE_REPLICATION_FACTOR
+              value: "1"
+            - name: OFFSET_STORAGE_REPLICATION_FACTOR
+              value: "1"
+            - name: STATUS_STORAGE_REPLICATION_FACTOR
+              value: "1"
+          # See k8s/10-kafka.yaml for why: a short livenessProbe
+          # initialDelaySeconds kills a slow-booting JVM service before it
+          # finishes starting, under real load. startupProbe fixes it.
+          startupProbe:
+            exec:
+              command: ["curl", "-sf", "http://localhost:8083/connectors"]
+            failureThreshold: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command: ["curl", "-sf", "http://localhost:8083/connectors"]
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["curl", "-sf", "http://localhost:8083/connectors"]
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-connect
+spec:
+  selector:
+    app: kafka-connect
+  ports:
+    - name: rest
+      port: 8083
+      targetPort: rest
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: connect-init
+spec:
+  backoffLimit: 30
+  activeDeadlineSeconds: 600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      enableServiceLinks: false
+      containers:
+        - name: connect-init
+          image: curlimages/curl:8.10.1
+          command: ["/bin/sh", "/connector/register-connector.sh"]
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_PASSWORD
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_DB
+          volumeMounts:
+            - name: connector-config
+              mountPath: /connector
+              readOnly: true
+      volumes:
+        - name: connector-config
+          configMap:
+            name: connector-files

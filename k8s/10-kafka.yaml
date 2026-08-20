@@ -1,0 +1,132 @@
+# Kafka, single-node KRaft, mirroring the infra/docker-compose.yml broker
+# (confluentinc/cp-kafka:7.6.1, same env). The advertised listener points at
+# the `kafka` Service DNS name so in-cluster clients (Connect, backend)
+# resolve it the same way compose clients resolve the `kafka` container name.
+# No Zookeeper (KRaft mode).
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kafka
+spec:
+  serviceName: kafka
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      # Kubernetes auto-injects legacy Docker-links-style env vars for every
+      # Service in the namespace (SVCNAME_PORT, SVCNAME_SERVICE_HOST, ...).
+      # Because our own Service is named "kafka", that means an auto-injected
+      # KAFKA_PORT=tcp://<clusterIP>:9092 lands in this pod's environment —
+      # which the Confluent entrypoint explicitly checks for and rejects as
+      # deprecated config, hard-failing with "port is deprecated..." before
+      # the JVM ever starts. Disabling service-link injection avoids this
+      # whole class of accidental env var collision; we address every other
+      # service purely by DNS name anyway, never via these injected vars.
+      enableServiceLinks: false
+      containers:
+        - name: kafka
+          image: confluentinc/cp-kafka:7.6.1
+          ports:
+            - name: kafka
+              containerPort: 9092
+            - name: controller
+              containerPort: 9093
+          env:
+            - name: KAFKA_NODE_ID
+              value: "1"
+            - name: CLUSTER_ID
+              value: "MkU3OEVBNTcwNTJENDM2Qk"
+            - name: KAFKA_PROCESS_ROLES
+              value: "broker,controller"
+            - name: KAFKA_CONTROLLER_QUORUM_VOTERS
+              value: "1@kafka:9093"
+            - name: KAFKA_CONTROLLER_LISTENER_NAMES
+              value: "CONTROLLER"
+            - name: KAFKA_LISTENERS
+              value: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
+            - name: KAFKA_ADVERTISED_LISTENERS
+              value: "PLAINTEXT://kafka:9092"
+            - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+              value: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"
+            - name: KAFKA_INTER_BROKER_LISTENER_NAME
+              value: "PLAINTEXT"
+            - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+              value: "1"
+            - name: KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS
+              value: "0"
+            - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
+              value: "true"
+          volumeMounts:
+            - name: kafka-data
+              mountPath: /var/lib/kafka/data
+          # A short livenessProbe initialDelaySeconds on a JVM service under
+          # real load is a startup-kill trap: if the broker takes longer than
+          # 30s to open its port (easily happens under CPU contention),
+          # kubelet SIGTERMs it before it ever finishes booting, and it never
+          # gets the chance to — an infinite restart loop that looks like a
+          # crash but is actually the probe never giving it time to start.
+          # startupProbe is k8s's actual answer to this: liveness/readiness
+          # are suspended until it succeeds once, with its own generous
+          # failure budget (up to 5 min here) for first boot.
+          startupProbe:
+            tcpSocket:
+              port: kafka
+            failureThreshold: 30
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: kafka
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: kafka
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
+  volumeClaimTemplates:
+    - metadata:
+        name: kafka-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+spec:
+  # Headless (clusterIP: None) + publishNotReadyAddresses: true. This is a
+  # single-node KRaft cluster where the same pod is both broker and
+  # controller: on boot, the broker registers itself with the controller
+  # quorum over this exact "kafka:9093" address. A normal ClusterIP Service
+  # only routes to endpoints of pods already marked Ready — but this pod
+  # can't become Ready until that self-registration succeeds. That's a
+  # deadlock (confirmed via logs: "Unable to register the broker because the
+  # RPC got timed out" -> fatal shutdown, in a restart loop). Headless +
+  # publishNotReadyAddresses makes DNS resolve straight to the pod IP
+  # regardless of readiness, breaking the cycle. Also matches the actual k8s
+  # convention the StatefulSet's `serviceName: kafka` already implies
+  # (StatefulSets expect their governing Service to be headless).
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app: kafka
+  ports:
+    - name: kafka
+      port: 9092
+      targetPort: kafka
+    - name: controller
+      port: 9093
+      targetPort: controller

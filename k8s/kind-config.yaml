@@ -1,0 +1,24 @@
+# kind cluster config for the flashseat booking-system demo.
+#
+# Maps the kind node's 80/443 to the host so the nginx ingress controller can
+# be reached at http://booking.local (add `127.0.0.1 booking.local` to
+# /etc/hosts). Without these mappings you can still verify the request path
+# via `kubectl port-forward svc/lb-proxy 8080:8080`.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: booking-system
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
+      - containerPort: 443
+        hostPort: 443
+        protocol: TCP
