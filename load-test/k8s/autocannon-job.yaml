@@ -1,0 +1,41 @@
+# Phase 4 load-test scaffolding only. Runs autocannon INSIDE the cluster
+# against a target Service's ClusterIP directly, so kubectl port-forward
+# (a single Go process proxying through the API server) is never the
+# bottleneck being measured.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: autocannon-runner
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      enableServiceLinks: false
+      containers:
+        - name: autocannon
+          image: node:22-alpine
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              npm install -g autocannon@latest --silent
+              echo "=== $TARGET_LABEL ==="
+              autocannon -c "$CONNECTIONS" -d "$DURATION" -w "$WORKERS" "$TARGET_URL"
+          env:
+            - name: TARGET_URL
+              value: "http://lb-proxy-loadtest.default.svc.cluster.local:8080/bookings/nonexistent"
+            - name: TARGET_LABEL
+              value: "P2C in-cluster, 8 backends, targeting 10k rps"
+            - name: CONNECTIONS
+              value: "400"
+            - name: DURATION
+              value: "20"
+            - name: WORKERS
+              value: "8"
+          resources:
+            requests:
+              cpu: "2"
+              memory: 512Mi
+            limits:
+              cpu: "4"
+              memory: 1Gi

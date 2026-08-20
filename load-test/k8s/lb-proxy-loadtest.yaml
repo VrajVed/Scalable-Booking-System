@@ -1,0 +1,78 @@
+# Phase 4 load-test scaffolding only. Same image/binary as k8s/50-lb-proxy.yaml,
+# just BACKEND_POOL widened to all 8 booking-backend-N pods currently up
+# (temporarily scaled for this load test — see load-test/README or session
+# notes for the revert-to-3 step) instead of the "production" static 3-pod
+# pool. P2C mode (default, no ROUTING_ALGORITHM override).
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lb-proxy-loadtest
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lb-proxy-loadtest
+  template:
+    metadata:
+      labels:
+        app: lb-proxy-loadtest
+    spec:
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+      containers:
+        - name: lb-proxy
+          image: booking-lb-proxy:local
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: BACKEND_POOL
+              value: "http://booking-backend-0.booking-backend-headless.default.svc.cluster.local:3000,http://booking-backend-1.booking-backend-headless.default.svc.cluster.local:3000,http://booking-backend-2.booking-backend-headless.default.svc.cluster.local:3000,http://booking-backend-3.booking-backend-headless.default.svc.cluster.local:3000,http://booking-backend-4.booking-backend-headless.default.svc.cluster.local:3000,http://booking-backend-5.booking-backend-headless.default.svc.cluster.local:3000,http://booking-backend-6.booking-backend-headless.default.svc.cluster.local:3000,http://booking-backend-7.booking-backend-headless.default.svc.cluster.local:3000"
+            - name: LISTEN_ADDR
+              value: "0.0.0.0:8080"
+            - name: LATENCY_SLO_MS
+              value: "1000"
+            - name: FIVE_XX_WINDOW_SECS
+              value: "10"
+            - name: HEALTH_POLL_MS
+              value: "500"
+            - name: MAX_BACKLOG
+              value: "200"
+            - name: MAX_5XX_COUNT
+              value: "10"
+            - name: MAX_IN_FLIGHT
+              value: "2000"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: "1"
+              memory: 128Mi
+            limits:
+              cpu: "2"
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lb-proxy-loadtest
+spec:
+  selector:
+    app: lb-proxy-loadtest
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

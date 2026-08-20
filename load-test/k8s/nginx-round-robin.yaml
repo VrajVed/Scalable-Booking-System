@@ -1,0 +1,79 @@
+# Phase 4 load-test scaffolding only — NOT part of the core deployment.
+# A plain nginx round-robin proxy pointed at the exact same 3 backend pods
+# lb-proxy routes to (same headless-Service DNS names), so a P2C-vs-round-robin
+# comparison is apples-to-apples: same backends, same network path, only the
+# routing algorithm differs. Deliberately as close to lb-proxy's own shape
+# (single replica, no extra resource headroom) as reasonably possible.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-round-robin-config
+data:
+  nginx.conf: |
+    events { worker_connections 1024; }
+    http {
+      upstream backend_pool {
+        # nginx's default load-balancing method with no directive specified
+        # is round-robin — this is deliberately the bare-minimum baseline,
+        # not tuned in any way, matching what CLAUDE.md's constraint calls
+        # for a fair comparison against.
+        server booking-backend-0.booking-backend-headless.default.svc.cluster.local:3000;
+        server booking-backend-1.booking-backend-headless.default.svc.cluster.local:3000;
+        server booking-backend-2.booking-backend-headless.default.svc.cluster.local:3000;
+      }
+      server {
+        listen 8080;
+        location / {
+          proxy_pass http://backend_pool;
+          proxy_set_header Host $host;
+        }
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-round-robin
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-round-robin
+  template:
+    metadata:
+      labels:
+        app: nginx-round-robin
+    spec:
+      enableServiceLinks: false
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports:
+            - name: http
+              containerPort: 8080
+          volumeMounts:
+            - name: config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
+      volumes:
+        - name: config
+          configMap:
+            name: nginx-round-robin-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-round-robin
+spec:
+  selector:
+    app: nginx-round-robin
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

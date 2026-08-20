@@ -1,0 +1,84 @@
+# Phase 4 load-test scaffolding only — NOT part of the core deployment.
+# Byte-identical to k8s/50-lb-proxy.yaml except ROUTING_ALGORITHM and the
+# name/labels/port, so the P2C-vs-round-robin comparison isolates the
+# algorithm: same binary, same image, same backend pool, same network path.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lb-proxy-round-robin
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lb-proxy-round-robin
+  template:
+    metadata:
+      labels:
+        app: lb-proxy-round-robin
+    spec:
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+      containers:
+        - name: lb-proxy
+          image: booking-lb-proxy:local
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: ROUTING_ALGORITHM
+              value: "round-robin"
+            - name: BACKEND_POOL
+              value: "http://booking-backend-0.booking-backend-headless.default.svc.cluster.local:3000,http://booking-backend-1.booking-backend-headless.default.svc.cluster.local:3000,http://booking-backend-2.booking-backend-headless.default.svc.cluster.local:3000"
+            - name: LISTEN_ADDR
+              value: "0.0.0.0:8080"
+            - name: LATENCY_SLO_MS
+              value: "1000"
+            - name: FIVE_XX_WINDOW_SECS
+              value: "10"
+            - name: HEALTH_POLL_MS
+              value: "500"
+            - name: MAX_BACKLOG
+              value: "100"
+            - name: MAX_5XX_COUNT
+              value: "10"
+            - name: MAX_IN_FLIGHT
+              value: "500"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lb-proxy-round-robin
+spec:
+  selector:
+    app: lb-proxy-round-robin
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
