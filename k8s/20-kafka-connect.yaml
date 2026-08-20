@@ -162,19 +162,34 @@ spec:
           # See k8s/10-kafka.yaml for why: a short livenessProbe
           # initialDelaySeconds kills a slow-booting JVM service before it
           # finishes starting, under real load. startupProbe fixes it.
+          #
+          # httpGet, not exec+curl: an exec probe spawns a fresh curl
+          # subprocess every check, and under CPU contention (GC pauses,
+          # other pods competing for the node's cores) that spawn can itself
+          # miss a tight timeout even when Connect's REST API is completely
+          # healthy -- observed in practice as repeated false-positive
+          # liveness failures and restart-looping on an otherwise-fine pod.
+          # httpGet is answered by the kubelet directly against the
+          # container's network namespace, no subprocess involved.
           startupProbe:
-            exec:
-              command: ["curl", "-sf", "http://localhost:8083/connectors"]
+            httpGet:
+              path: /connectors
+              port: rest
             failureThreshold: 30
             periodSeconds: 10
+            timeoutSeconds: 5
           readinessProbe:
-            exec:
-              command: ["curl", "-sf", "http://localhost:8083/connectors"]
+            httpGet:
+              path: /connectors
+              port: rest
             periodSeconds: 5
+            timeoutSeconds: 5
           livenessProbe:
-            exec:
-              command: ["curl", "-sf", "http://localhost:8083/connectors"]
+            httpGet:
+              path: /connectors
+              port: rest
             periodSeconds: 10
+            timeoutSeconds: 5
           resources:
             requests:
               cpu: 250m
