@@ -47,8 +47,24 @@ data:
 
     CONNECT_URL="http://kafka-connect:8083"
 
+    # Bounded, not infinite. This Job's own activeDeadlineSeconds (600s) and
+    # backoffLimit (30, each retry a fresh pod/container) already provide an
+    # outer ceiling, but an unbounded inner wait with only a single log line
+    # made a genuinely stuck Kafka Connect indistinguishable from "still
+    # booting" until the Job's outer deadline finally killed it. 150 attempts
+    # * 2s = 5 minutes per attempt -- comfortably under the 600s Job ceiling,
+    # loud and diagnosable well before it. Mirrors the compose path
+    # (infra/connector/register-connector.sh), same reasoning.
+    MAX_ATTEMPTS=150
+    ATTEMPTS=0
+
     echo "Waiting for Kafka Connect at ${CONNECT_URL}..."
     until curl -sf "${CONNECT_URL}/connectors" >/dev/null; do
+      ATTEMPTS=$((ATTEMPTS + 1))
+      if [ "$ATTEMPTS" -ge "$MAX_ATTEMPTS" ]; then
+        echo "Kafka Connect did not become ready after $((MAX_ATTEMPTS * 2))s -- giving up."
+        exit 1
+      fi
       sleep 2
     done
 

@@ -16,8 +16,23 @@ set -eu
 
 CONNECT_URL="http://kafka-connect:8083"
 
+# Bounded, not infinite: compose's own depends_on: condition: service_healthy
+# already means kafka-connect passed ITS OWN healthcheck before this
+# container even starts, so this loop rarely needs more than a couple of
+# iterations in practice -- but an unbounded wait with only a single log line
+# turns a genuinely stuck Kafka Connect into a silent hang instead of a loud,
+# diagnosable failure. 150 attempts * 2s = 5 minutes, generous relative to
+# the healthcheck's own ~100s (20 retries * 5s) budget.
+MAX_ATTEMPTS=150
+ATTEMPTS=0
+
 echo "Waiting for Kafka Connect at ${CONNECT_URL}..."
 until curl -sf "${CONNECT_URL}/connectors" >/dev/null; do
+  ATTEMPTS=$((ATTEMPTS + 1))
+  if [ "$ATTEMPTS" -ge "$MAX_ATTEMPTS" ]; then
+    echo "Kafka Connect did not become ready after $((MAX_ATTEMPTS * 2))s -- giving up."
+    exit 1
+  fi
   sleep 2
 done
 

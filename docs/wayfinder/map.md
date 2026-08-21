@@ -254,11 +254,16 @@ cadence rather than inventing more changes; will pick up real work again if
 something concrete surfaces (a genuine gap, or user direction in the
 morning) rather than padding this map for its own sake.
 
+- [connect-init bounded wait](tickets/0016-connect-init-bounded-wait.md) —
+  picked up during a quiet standby tick since it was already fully scoped.
+  Both `register-connector.sh` copies (compose + k8s ConfigMap) now give up
+  loudly after 5 minutes instead of waiting silently forever. Compose path
+  live-verified (`--force-recreate connect-init`, real 409, exit 0); k8s copy
+  only syntax-checked + diff-confirmed identical to the verified one — no
+  cluster tonight (RAM).
+
 ## Not yet specified
 
-- compose's `connect-init` wait loop has no timeout/max-attempts (benign
-  today, masked by compose's own `depends_on: condition: service_healthy`)
-  — noted, not yet worth a ticket.
 - Whether/how Prometheus+Grafana get wired into `k8s/` — deferred in ADR
   0003, RAM-gated tonight too.
 - No Grafana dashboards yet (ADR 0003) — deliberately deferred until there's
