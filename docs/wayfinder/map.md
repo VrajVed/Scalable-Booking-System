@@ -232,6 +232,27 @@ formal tickets, but the baseline this map builds on)*
   releases the gauge. Verified the test actually catches the bug: temporarily
   neutered the fix, watched it fail (`1 !== 0`), restored it, watched it pass.
   66/66 tests passing
+- **End-to-end real-traffic validation (2026-08-22, ~00:41)** — not a ticket,
+  a sanity check on tonight's observability work: ran a small real (not
+  fabricated) smoke test against the live backend using existing seed data —
+  register, login, 5 real seat reservations, a deliberate 409 double-book, a
+  401 no-auth attempt, a 404 — and confirmed `/metrics` showed the honest
+  resulting status-code spread, `booking_events_published_total` incremented
+  for real, and the backend log showed 5 fresh
+  `[kafka] invalidated cache seats:availability:event:7` lines — the whole
+  WAL→Debezium→Kafka→consumer→Redis path fired live, not just at boot.
+
+**Status at this point (2026-08-22, ~00:45)**: 5 commits since the RAM caution
+kicked off this session (observability, README+3-real-bugs, hold-expiry
+retry/DLQ, in-flight regression test), all verified with real builds/tests/
+live traffic, none pushed (per instruction). No further adversarial sweep
+queued right now — 3 independent ones tonight (this map's own history plus
+0012 and 0014) have covered auth, booking-flow, k8s/infra consistency, the
+CDC mapper, and the hold-expiry chain; a 4th right now risks manufacturing
+findings rather than finding real ones. Shifting to a lighter health-check
+cadence rather than inventing more changes; will pick up real work again if
+something concrete surfaces (a genuine gap, or user direction in the
+morning) rather than padding this map for its own sake.
 
 ## Not yet specified
 
