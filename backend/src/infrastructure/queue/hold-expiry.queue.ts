@@ -30,7 +30,18 @@ export async function scheduleHoldExpiry(bookingId: number, holdExpiresAt: Date)
       delay,
       jobId: `hold-expiry-${bookingId}`,
       removeOnComplete: true,
-      removeOnFail: true,
+      // A transient failure (DB pool exhaustion, brief connection blip) used
+      // to be permanent: default BullMQ is 1 attempt, and removeOnFail: true
+      // deleted the job outright on that single failure. Since this queue is
+      // the ONLY thing that ever reverts an abandoned hold (zero polling --
+      // nothing else sweeps the bookings table), that meant the seat stayed
+      // 'held' forever with no way to even discover it happened. Retry with
+      // backoff for real transient errors, and keep failed jobs around
+      // (bounded, not unbounded) as a lightweight DLQ instead of deleting the
+      // only record that this ever went wrong.
+      attempts: 3,
+      backoff: { type: "exponential", delay: 5000 },
+      removeOnFail: { count: 200 },
     },
   );
 }

@@ -110,6 +110,21 @@ describe("scheduleHoldExpiry — jobId fix (was: 'Custom Id cannot contain :')",
     const job = await holdExpiryQueue.getJob(jobId);
     assert.ok(job, `expected a real BullMQ job enqueued under id '${jobId}' -- the pre-fix ':' jobId never enqueued at all`);
 
+    // A transient failure used to be permanent: default BullMQ is 1 attempt,
+    // and the old removeOnFail: true deleted the job outright, leaving a
+    // held seat with no way to ever discover it happened (this queue is the
+    // only thing that reverts an abandoned hold -- zero polling elsewhere).
+    // Assert the real enqueued job's options directly, not just the source
+    // file's config object, so a future change to scheduleHoldExpiry can't
+    // silently drop this without failing a test.
+    assert.equal(job!.opts.attempts, 3, "hold-expiry jobs must retry a transient failure, not give up after one attempt");
+    assert.ok(job!.opts.backoff, "hold-expiry jobs must back off between retries, not hammer immediately");
+    assert.notEqual(
+      job!.opts.removeOnFail,
+      true,
+      "a permanently-failed hold-expiry job must NOT be deleted outright -- it's the only record a seat may be stuck",
+    );
+
     // Housekeeping: this job carries the real (long) HOLD_DURATION_MS delay
     // since it went through reserveSeat's normal path, so it won't fire
     // during this test run -- remove it explicitly rather than leaving a

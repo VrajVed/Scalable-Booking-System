@@ -37,9 +37,31 @@ export function startHoldExpiryWorker(): Worker<HoldExpiryJobData> {
     { connection: bullMQConnection },
   );
 
+  // BullMQ's 'failed' event fires on EVERY failed attempt, not just once a
+  // job gives up -- with the retry/backoff added in hold-expiry.queue.ts, a
+  // single transient error now fires this up to 3 times for what's really
+  // one logical failure. Only count/escalate the terminal case (retries
+  // exhausted); log intermediate retries at a lower severity so they don't
+  // read as "a seat is stuck" when BullMQ is about to try again on its own.
   worker.on("failed", (job, err) => {
-    holdExpiryJobsTotal.inc({ outcome: "failed" });
-    console.error("[hold-expiry] job failed", { bookingId: job?.data.bookingId, err });
+    const attemptsMade = job?.attemptsMade ?? 0;
+    const maxAttempts = job?.opts.attempts ?? 1;
+
+    if (attemptsMade >= maxAttempts) {
+      holdExpiryJobsTotal.inc({ outcome: "failed" });
+      console.error("[hold-expiry] job permanently failed after exhausting retries -- seat may be stuck held", {
+        bookingId: job?.data.bookingId,
+        attemptsMade,
+        err,
+      });
+    } else {
+      console.warn("[hold-expiry] job attempt failed, will retry", {
+        bookingId: job?.data.bookingId,
+        attemptsMade,
+        maxAttempts,
+        err,
+      });
+    }
   });
 
   return worker;

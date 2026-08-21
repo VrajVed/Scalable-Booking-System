@@ -209,6 +209,20 @@ formal tickets, but the baseline this map builds on)*
   existing intentionally-unused-param convention isn't flagged as noise.
   4 real dead-code findings surfaced and fixed (unused imports/params in
   test files). 64/64 tests still passing after
+- [hold-expiry retry + DLQ](tickets/0014-hold-expiry-retry-and-dlq.md) — third
+  adversarial sweep (debezium-mapper.ts + hold-expiry chain, neither covered by
+  0005/0009/0012). Mapper: clean. Real bug found: hold-expiry jobs had no retry
+  (BullMQ default 1 attempt) and `removeOnFail: true` — since this queue is the
+  *only* thing that ever reverts an abandoned hold (zero polling), a single
+  transient DB error permanently stranded a `held` seat with zero trace. Fixed
+  with `attempts: 3` + exponential backoff + a bounded `removeOnFail: {count:
+  200}` DLQ, a corrected `failed`-event handler (was about to over-count the
+  metric 3x per real failure since BullMQ fires it per attempt, not once), and
+  a regression test asserting the real enqueued job's own opts. Confirm/expire
+  race, producer-shutdown ordering, and the schedule-failure path all confirmed
+  already-correct, not just assumed. 64/64 tests passing (dev-server-vs-test
+  BullMQ contention reproduced again mid-verification, same root cause as
+  earlier tonight — confirmed environment, not code, by rerunning isolated)
 
 ## Not yet specified
 
