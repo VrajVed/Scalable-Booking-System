@@ -2,6 +2,7 @@ import { Worker, type Job } from "bullmq";
 import { bullMQConnection } from "../../config/redis.js";
 import { expireHold } from "../../modules/booking/application/expire-hold.usecase.js";
 import { closeHoldExpiryQueue, HOLD_EXPIRY_QUEUE_NAME, type HoldExpiryJobData } from "./hold-expiry.queue.js";
+import { holdExpiryJobsTotal } from "../../shared/metrics/registry.js";
 
 let worker: Worker<HoldExpiryJobData> | null = null;
 
@@ -20,11 +21,13 @@ export function startHoldExpiryWorker(): Worker<HoldExpiryJobData> {
       const result = await expireHold(bookingId);
 
       if (result) {
+        holdExpiryJobsTotal.inc({ outcome: "reverted" });
         console.log("[hold-expiry] reverted abandoned hold", {
           bookingId,
           seatId: result.booking.seatId,
         });
       } else {
+        holdExpiryJobsTotal.inc({ outcome: "noop" });
         console.log(
           "[hold-expiry] booking no longer pending at expiry time -- no-op (confirmed/cancelled/already expired)",
           { bookingId },
@@ -35,6 +38,7 @@ export function startHoldExpiryWorker(): Worker<HoldExpiryJobData> {
   );
 
   worker.on("failed", (job, err) => {
+    holdExpiryJobsTotal.inc({ outcome: "failed" });
     console.error("[hold-expiry] job failed", { bookingId: job?.data.bookingId, err });
   });
 

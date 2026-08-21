@@ -19,7 +19,8 @@ This project merges three existing repos into one unified system:
 ## Commands
 
 - Bring up infra: `cd infra && docker compose up -d` (Postgres + Kafka KRaft +
-  Kafka Connect/Debezium + Redis; connector auto-registers via `connect-init`)
+  Kafka Connect/Debezium + Redis + Prometheus + Grafana; connector auto-registers via
+  `connect-init`, Grafana auto-provisions its Prometheus datasource)
 - Backend dev server: `cd backend && npm install && npm run dev` (tsx watch)
 - Backend build/typecheck: `cd backend && npm run build`
 - Drizzle migrations: `cd backend && npm run db:generate` / `npm run db:migrate`.
@@ -30,7 +31,12 @@ This project merges three existing repos into one unified system:
 - Rust LB library: `cd router-core && cargo test`
 - Rust reverse proxy: `cd lb-proxy && BACKEND_POOL=http://localhost:3001,http://localhost:3002 cargo run`
   (wraps router-core's P2C router; see lb-proxy/README.md for env vars)
-- k8s / load tests: not built yet (Phase 3/4)
+- Metrics: backend `/metrics` (port 3000) and lb-proxy `/metrics` (port 8080) are both
+  Prometheus scrape targets — Prometheus UI at `:9090` (`PROMETHEUS_PORT`), Grafana at
+  `:3001` (`GRAFANA_PORT`) once infra is up. See ADR 0003.
+- k8s: manifests done (Phase 3), load tests done (Phase 4) — see docs/wayfinder/
+  tickets/ for the audit trail. Observability (this ADR) is docker-compose-only so
+  far, not yet wired into k8s/.
 
 ## Architecture Decisions
 
@@ -70,6 +76,17 @@ docker-compose). Topics: booking.events, payment.events, cdc.public.seats, etc.
 ### Deployment — Kubernetes
 Target: kind or minikube for local dev, AWS EKS or GCP GKE for production demo.
 Manifests in k8s/ directory. HPA for booking service pods. Ingress via nginx.
+
+### Observability — Prometheus + Grafana (ADR 0003)
+Backend exposes `/metrics` via `prom-client` (HTTP duration/in-flight, Node process
+metrics, CDC-consumer/Kafka-producer connection gauges, booking-event and
+hold-expiry-job counters). lb-proxy exposes a hand-rolled `/metrics` in Prometheus
+text format straight off the existing `ServerHealth` struct — per-backend request
+count (= P2C/round-robin selection count), in-flight, 5xx rate, latency EMA. Both are
+scraped by a `prometheus` compose service; `grafana` auto-provisions that as its
+datasource. This exists so the ML-shelving decision (see Load Balancer section above)
+can eventually be revisited on real telemetry instead of staying purely theoretical —
+no dashboards built yet, no k8s wiring yet. See docs/adr/0003-observability-prometheus-grafana.md.
 
 ## Conventions
 

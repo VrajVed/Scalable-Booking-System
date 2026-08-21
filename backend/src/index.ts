@@ -11,6 +11,7 @@ import { startCdcConsumer, isCdcConsumerConnected } from "./infrastructure/kafka
 import { startHoldExpiryWorker } from "./infrastructure/queue/hold-expiry.worker.js";
 import { registerShutdownHandlers } from "./shutdown.js";
 import { redisConnection } from "./config/redis.js";
+import { registry, httpRequestDuration, httpRequestsInFlight } from "./shared/metrics/registry.js";
 
 const app = Fastify({
   logger: {
@@ -39,6 +40,32 @@ app.addHook("onRequest", async (request, reply) => {
 });
 
 app.addHook("onSend", securityHeaders);
+
+app.addHook("onRequest", async () => {
+  httpRequestsInFlight.inc();
+});
+
+// onResponse runs on both the success and error paths (errorHandler just
+// sets the reply before onSend/onResponse still fire), so this is the one
+// place that reliably pairs with the onRequest increment above.
+app.addHook("onResponse", async (request, reply) => {
+  httpRequestsInFlight.dec();
+  // request.routeOptions.url is the declared route pattern (e.g.
+  // "/bookings/reserve"), not the raw URL -- keeps label cardinality bounded
+  // even if this app grows path params later. Requests that never matched a
+  // route (404s, probes) fall back to a single "unmatched" bucket instead of
+  // one time series per garbage path.
+  const route = request.routeOptions?.url ?? "unmatched";
+  httpRequestDuration.observe(
+    { method: request.method, route, status_code: reply.statusCode },
+    reply.elapsedTime / 1000,
+  );
+});
+
+app.get("/metrics", async (_request, reply) => {
+  reply.header("Content-Type", registry.contentType);
+  return registry.metrics();
+});
 
 app.get("/health", async (request, reply) => {
   const redisHealthy = await Promise.race([

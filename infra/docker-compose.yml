@@ -97,5 +97,36 @@ services:
       - ./connector:/connector:ro
     entrypoint: ["/bin/sh", "/connector/register-connector.sh"]
 
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: booking-system-prometheus
+    restart: unless-stopped
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - promdata:/prometheus
+    # Backend and lb-proxy run on the host, not as compose services -- see
+    # prometheus.yml for why this mapping is needed to scrape them.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    container_name: booking-system-grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafanadata:/var/lib/grafana
+
 volumes:
   pgdata:
+  promdata:
+  grafanadata:

@@ -396,6 +396,11 @@ async fn handle(
         return Ok(health_response(state));
     }
 
+    // Prometheus scrape target — same never-routed-to-a-backend rule as /health.
+    if req.method() == Method::GET && req.uri().path() == "/metrics" {
+        return Ok(metrics_response(state));
+    }
+
     let (parts, body) = req.into_parts();
     let method = parts.method.clone();
     let path_and_query = parts
@@ -546,6 +551,67 @@ fn health_response(state: &ProxyState) -> Response<BoxBody<Bytes, BoxErr>> {
     resp.headers_mut().insert(
         http::header::CONTENT_TYPE,
         http::HeaderValue::from_static("application/json"),
+    );
+    resp
+}
+
+/// Prometheus text-exposition-format scrape target. Hand-rolled rather than
+/// pulling in the `prometheus` crate: every value already lives in
+/// `ServerHealth` (the same fields `health_response`'s JSON reads), so a
+/// crate would only buy us a format we can produce in a dozen `format!`
+/// calls. `requests_total` per backend is `ServerHealth::total_requests()` —
+/// this doubles as router-core's per-backend selection count, i.e. "did P2C
+/// actually spread load" is answerable straight from this endpoint.
+fn metrics_response(state: &ProxyState) -> Response<BoxBody<Bytes, BoxErr>> {
+    let mut out = String::new();
+
+    out.push_str("# HELP lb_proxy_requests_total Total requests routed by this proxy.\n");
+    out.push_str("# TYPE lb_proxy_requests_total counter\n");
+    out.push_str(&format!("lb_proxy_requests_total {}\n", state.requests_total()));
+
+    out.push_str("# HELP lb_proxy_backend_requests_total Requests routed to this backend (lifetime) -- also the P2C/round-robin selection count.\n");
+    out.push_str("# TYPE lb_proxy_backend_requests_total counter\n");
+    out.push_str("# HELP lb_proxy_backend_in_flight In-flight requests currently dispatched to this backend.\n");
+    out.push_str("# TYPE lb_proxy_backend_in_flight gauge\n");
+    out.push_str("# HELP lb_proxy_backend_five_xx_in_window 5xx responses observed in the trailing health window.\n");
+    out.push_str("# TYPE lb_proxy_backend_five_xx_in_window gauge\n");
+    out.push_str("# HELP lb_proxy_backend_error_rate Fraction of requests in the trailing window that returned 5xx.\n");
+    out.push_str("# TYPE lb_proxy_backend_error_rate gauge\n");
+    out.push_str("# HELP lb_proxy_backend_latency_ema_seconds Exponential moving average of backend response-head latency, the same signal router-core's risk prediction is derived from.\n");
+    out.push_str("# TYPE lb_proxy_backend_latency_ema_seconds gauge\n");
+
+    for (i, url) in state.backends().iter().enumerate() {
+        let sid = ServerId(i as u64);
+        let Some(health) = state.server_health(sid) else {
+            continue;
+        };
+        let labels = format!("backend=\"{i}\",url=\"{url}\"");
+        let snap = health.snapshot(state.five_xx_window);
+
+        out.push_str(&format!(
+            "lb_proxy_backend_requests_total{{{labels}}} {}\n",
+            health.total_requests()
+        ));
+        out.push_str(&format!("lb_proxy_backend_in_flight{{{labels}}} {}\n", snap.in_flight));
+        out.push_str(&format!(
+            "lb_proxy_backend_five_xx_in_window{{{labels}}} {}\n",
+            health.five_xx_count(state.five_xx_window)
+        ));
+        out.push_str(&format!(
+            "lb_proxy_backend_error_rate{{{labels}}} {}\n",
+            health.error_rate(state.five_xx_window)
+        ));
+        out.push_str(&format!(
+            "lb_proxy_backend_latency_ema_seconds{{{labels}}} {}\n",
+            health.latency_ema_ns() as f64 / 1_000_000_000.0
+        ));
+    }
+
+    let mut resp = Response::new(box_bytes(Bytes::from(out)));
+    *resp.status_mut() = StatusCode::OK;
+    resp.headers_mut().insert(
+        http::header::CONTENT_TYPE,
+        http::HeaderValue::from_static("text/plain; version=0.0.4"),
     );
     resp
 }

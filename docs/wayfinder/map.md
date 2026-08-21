@@ -77,6 +77,28 @@ missing mechanism (e.g. hold-expiry) is the gap being closed.
   Anthropic pool) for judgment-heavier tickets that would otherwise go to
   Sonnet. Keep my own context lean: don't re-read full opencode reports
   into my context, skim+verify+link instead.
+- **Session gap (2026-08-21, evening)**: a separate same-day session (not
+  this map) did a full local-JWT-auth migration (Clerk → JWT, ADR 0002),
+  seed data, load testing (autocannon, P2C vs round-robin — Phase 4, closes
+  the "Out of scope" note below), a real 8-replica scaled-up k8s test, and
+  got 47 uncommitted files from across multiple sessions into 5 commits.
+  Tickets 0009 (post-JWT audit) and 0010 (kafka-connect exec→httpGet probe
+  fix) were filed and resolved under *this* map's numbering during that
+  session but hadn't been indexed here yet — backfilled below. Phase 4 load
+  testing is therefore done, not deferred; leaving the original "Out of
+  scope" bullet below as-written (historical record of that day's call) and
+  noting the update here instead of editing it.
+- **Overnight session (2026-08-21/22)**: user handed off "work on the next
+  thing" + explicit RAM caution (~700Mi free / 5.7Gi swapped at start — see
+  new incident precedent above from 2026-08-20 under similar pressure).
+  Picked up observability (ADR 0003: prom-client on backend, hand-rolled
+  Prometheus text on lb-proxy, compose-only) as the next concrete gap per
+  CLAUDE.md's roadmap (needs real telemetry before the shelved ML question
+  can be responsibly revisited), plus resolving test-suite flakiness caused
+  by a leftover dev server sharing the same Redis/BullMQ instance as the
+  test suite. No new kind cluster tonight — RAM. Continuing this map's
+  dispatch-mix and AFK-only conventions from 2026-08-20 rather than
+  reinventing them.
 
 ## Decisions so far
 
@@ -140,6 +162,28 @@ formal tickets, but the baseline this map builds on)*
   tests), strengthened 6 weak test assertions, corrected 4 points of drift
   in `k8s/README.md`; caught the hold-expiry jobId bug (ticket 0001) and
   the migrations/connector-cred gaps (graduated to tickets 0006, 0007)
+- [Post-JWT-migration audit](tickets/0009-post-jwt-migration-audit.md) —
+  found + fixed a real HIGH-severity timing side-channel in
+  `login.usecase.ts` (email enumeration via response latency), fixed a
+  stale `k8s/README.md` smoke-test example; everything else checked out
+  clean (JWT alg-confusion, userId-spoofing, register race, config drift)
+- [kafka-connect exec→httpGet probe fix](tickets/0010-kafka-connect-probe-fix.md) —
+  exec-probe subprocess-spawn overhead under CPU contention was causing
+  restart-looping; switched to httpGet, live-verified 0 restarts over an
+  8-minute window on a real kind cluster with the REST API responsive
+  throughout and CDC registration intact
+- [Observability: Prometheus + Grafana](../adr/0003-observability-prometheus-grafana.md) —
+  prom-client `/metrics` on the backend (HTTP histogram, process metrics,
+  CDC/Kafka connection gauges, booking-event + hold-expiry counters), a
+  hand-rolled Prometheus-text `/metrics` on lb-proxy off the existing
+  `ServerHealth` struct (per-backend request count doubles as the P2C
+  selection count), both wired into compose. DB-level metrics explicitly
+  deferred (postgres.js doesn't expose pool internals cleanly)
+- [Prometheus/Grafana bring-up, verified](tickets/0011-prometheus-grafana-bringup-verify.md) —
+  brought the two new compose services up for real (RAM checked before/after,
+  small acceptable dip), both scrape targets confirmed `up`, Grafana's
+  datasource auto-provisioning confirmed via its own API, `up{job=...}`
+  queried directly through Prometheus as end-to-end proof
 
 ## Not yet specified
 
@@ -152,6 +196,10 @@ formal tickets, but the baseline this map builds on)*
 - compose's `connect-init` wait loop has no timeout/max-attempts (benign
   today, masked by compose's own `depends_on: condition: service_healthy`)
   — noted, not yet worth a ticket.
+- Whether/how Prometheus+Grafana get wired into `k8s/` — deferred in ADR
+  0003, RAM-gated tonight too.
+- No Grafana dashboards yet (ADR 0003) — deliberately deferred until there's
+  real traffic to shape panels around, not charted as a ticket.
 
 ## Out of scope
 
@@ -162,3 +210,7 @@ formal tickets, but the baseline this map builds on)*
   scope for this map. If load-test work starts, it gets its own map.
 - Pushing to the GitHub remote / resolving the unpushed `ab47712` commit —
   a repo-history decision for the human, not a code-fix ticket.
+- New kind clusters / k8s load tests tonight (2026-08-21/22) — RAM.
+- Frontend work — idea.md non-goal (API-first, thin demo at most).
+- Payment/notification services from idea.md's target architecture — in
+  scope eventually, not started, not scoped for tonight.

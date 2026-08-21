@@ -1,4 +1,5 @@
 import { kafka } from "../../config/kafka.js";
+import { kafkaProducerConnected, bookingEventsPublishedTotal } from "../../shared/metrics/registry.js";
 
 const producer = kafka.producer();
 let connected = false;
@@ -6,6 +7,7 @@ let connected = false;
 export async function connectProducer(): Promise<void> {
   await producer.connect();
   connected = true;
+  kafkaProducerConnected.set(1);
 }
 
 export function isProducerConnected(): boolean {
@@ -15,6 +17,7 @@ export function isProducerConnected(): boolean {
 export async function disconnectProducer(): Promise<void> {
   await producer.disconnect();
   connected = false;
+  kafkaProducerConnected.set(0);
 }
 
 export async function publishBookingEvent(
@@ -30,4 +33,5 @@ export async function publishBookingEvent(
       },
     ],
   });
+  bookingEventsPublishedTotal.inc({ type: eventType });
 }

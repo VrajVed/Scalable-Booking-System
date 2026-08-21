@@ -2,6 +2,7 @@ import { kafka } from "../../config/kafka.js";
 import { env } from "../../config/env.js";
 import { redisConnection } from "../../config/redis.js";
 import { mapDebeziumMessage } from "./debezium-mapper.js";
+import { cdcConsumerConnected } from "../../shared/metrics/registry.js";
 
 // Consumes Debezium's CDC envelope for the seats table and invalidates the
 // per-event seat-availability cache key. This is the whole point of wiring
@@ -67,16 +68,19 @@ export async function handleCdcMessage(rawValue: Buffer | string | null | undefi
 export async function startCdcConsumer(): Promise<void> {
   consumer.on(consumer.events.CRASH, ({ payload }) => {
     connected = false;
+    cdcConsumerConnected.set(0);
     console.error("[kafka] cdc consumer crashed", payload);
   });
 
   consumer.on(consumer.events.CONNECT, () => {
     connected = true;
+    cdcConsumerConnected.set(1);
     console.log("[kafka] cdc consumer connected");
   });
 
   consumer.on(consumer.events.DISCONNECT, () => {
     connected = false;
+    cdcConsumerConnected.set(0);
   });
 
   await consumer.connect();

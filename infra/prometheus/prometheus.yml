@@ -1,0 +1,19 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  # Backend and lb-proxy run on the host (`npm run dev` / `cargo run`, per
+  # CLAUDE.md's dev commands), not as compose services -- so Prometheus
+  # reaches them via the host gateway, not compose's internal DNS.
+  # `extra_hosts: host.docker.internal:host-gateway` on the prometheus
+  # service below is what makes this resolve on Linux (it's automatic on
+  # Docker Desktop, but not on a plain Linux Docker Engine).
+  - job_name: booking-backend
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:3000"]
+
+  - job_name: lb-proxy
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:8080"]
