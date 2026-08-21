@@ -191,7 +191,7 @@ describe("reserveSeat — real concurrency", () => {
     const N = 25;
 
     const results = await Promise.allSettled(
-      Array.from({ length: N }, (_, i) => reserveSeat({ seatId, userId })),
+      Array.from({ length: N }, () => reserveSeat({ seatId, userId })),
     );
 
     const fulfilled = results.filter((r) => r.status === "fulfilled");

@@ -6,7 +6,6 @@ import { db, closeDb } from "../../src/infrastructure/database/db.js";
 import { seats, bookings } from "../../src/infrastructure/database/schema/index.js";
 import {
   scheduleHoldExpiry,
-  closeHoldExpiryQueue,
   holdExpiryQueue,
   type HoldExpiryJobData,
 } from "../../src/infrastructure/queue/hold-expiry.queue.js";

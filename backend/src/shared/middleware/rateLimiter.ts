@@ -15,7 +15,22 @@ export class RateLimitError extends AppError {
 const WINDOW_SECONDS = env.RATE_LIMIT_WINDOW_SECONDS;
 const MAX_REQUESTS = env.RATE_LIMIT_MAX_REQUESTS;
 
+// Ops/probe endpoints, not business traffic -- exempt from the limit itself
+// AND from depending on Redis at all. This matters specifically because
+// /health's own handler already bounds a Redis outage with a 2s race and
+// returns a clean 503 (see index.ts) -- if this preHandler ran first and
+// Redis were unreachable, its unbounded redisConnection.incr() would throw
+// (or hang, depending on ioredis's retry config) before /health's careful
+// handling ever got a chance to run, defeating the whole point of it. Same
+// reasoning applies to /metrics: a Redis blip is exactly when you most need
+// scrapeable signal, not a 500 from an unrelated rate-limit check.
+const EXEMPT_ROUTES = new Set(["/health", "/metrics"]);
+
 export const rateLimiter = async (request: FastifyRequest, _reply: FastifyReply): Promise<void> => {
+  if (request.routeOptions?.url && EXEMPT_ROUTES.has(request.routeOptions.url)) {
+    return;
+  }
+
   // request.ip is computed by Fastify from the X-Forwarded-For chain ONLY
   // when trustProxy (index.ts) says the direct TCP peer is the trusted
   // proxy — lb-proxy, which overwrites the header with the real peer IP.

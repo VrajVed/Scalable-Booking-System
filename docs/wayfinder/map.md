@@ -99,6 +99,17 @@ missing mechanism (e.g. hold-expiry) is the gap being closed.
   test suite. No new kind cluster tonight — RAM. Continuing this map's
   dispatch-mix and AFK-only conventions from 2026-08-20 rather than
   reinventing them.
+- **Dispatch-model update (2026-08-22, ~00:30)**: `opencode/deepseek-v4-flash-free`
+  is gone from OpenCode's free catalog entirely (not a rename — `opencode models`
+  doesn't list it, confirmed via `--verbose`). Switched small/mechanical dispatches
+  to `opencode/nemotron-3.5-lightning-free` for the rest of this session (also
+  `"variants": {}`, same no-reasoning-tier shape as the old default — omit
+  `--variant` same as before). **Lesson from the first dispatch** (ticket 0012):
+  this tier of free model gets *content* right reliably but is not trustworthy for
+  *structural* correctness unsupervised — it produced an accurate README update but
+  also a garbled ASCII diagram and a broken/split code fence, both silently, while
+  its own final summary claimed full success. Always do a manual read-through after
+  a small-model dispatch touching prose/formatting, not just a diff skim.
 
 ## Decisions so far
 
@@ -184,15 +195,23 @@ formal tickets, but the baseline this map builds on)*
   small acceptable dip), both scrape targets confirmed `up`, Grafana's
   datasource auto-provisioning confirmed via its own API, `up{job=...}`
   queried directly through Prometheus as end-to-end proof
+- [README sync + observability code review](tickets/0012-readme-sync-and-observability-review.md) —
+  root README.md brought current (Phase 3/4 status, JWT curl example, new
+  Architecture diagram, Observability section); a Sonnet review of commit
+  `3f24e19` found + fixed 3 real gaps: an in-flight-gauge leak on client-aborted
+  requests, a stale `kafka_producer_connected` gauge on unexpected disconnects,
+  and `/metrics`+`/health` being blockable by the same Redis-backed rate limiter
+  they're meant to help diagnose. 64/64 tests passing after fixes
+- [eslint flat-config setup](tickets/0013-eslint-flat-config-setup.md) —
+  `npm run lint` had been broken since ESLint v9 (no flat config anywhere);
+  fixed with `typescript-eslint`'s `tseslint.config()` helper + an
+  `argsIgnorePattern`/`varsIgnorePattern: "^_"` addition so the codebase's
+  existing intentionally-unused-param convention isn't flagged as noise.
+  4 real dead-code findings surfaced and fixed (unused imports/params in
+  test files). 64/64 tests still passing after
 
 ## Not yet specified
 
-- Whether `README.md`'s (repo-root) top-level Status section still
-  accurately reflects Phase 3 being done — not charted as a ticket yet
-  because it's copy, not a bug, and lower priority than functional gaps.
-- `npm run lint` is broken (no eslint config anywhere in the repo) — minor,
-  not yet worth a ticket on its own; might fold into whichever ticket next
-  touches backend tooling.
 - compose's `connect-init` wait loop has no timeout/max-attempts (benign
   today, masked by compose's own `depends_on: condition: service_healthy`)
   — noted, not yet worth a ticket.

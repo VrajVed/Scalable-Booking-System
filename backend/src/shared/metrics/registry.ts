@@ -1,5 +1,15 @@
 import client from "prom-client";
 
+declare module "fastify" {
+  interface FastifyRequest {
+    // Set in index.ts's onRequest hook, read by both its onResponse hook and
+    // its request.raw 'close' listener so http_requests_in_flight is
+    // decremented exactly once per request regardless of which one runs
+    // first (see index.ts for why both exist).
+    inFlightAccountedFor?: boolean;
+  }
+}
+
 // Single shared registry for every metric in the process, scraped via the
 // /metrics route in index.ts. collectDefaultMetrics adds Node process
 // metrics for free (CPU, RSS/heap, event loop lag, GC pauses, active

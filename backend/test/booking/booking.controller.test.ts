@@ -4,7 +4,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { bookingRoutes } from "../../src/modules/booking/interface/booking.routes.js";
 import { errorHandler } from "../../src/shared/middleware/errorHandler.js";
 import { signAuthToken } from "../../src/shared/auth/jwt.js";
-import { connectProducer, disconnectProducer } from "../../src/infrastructure/kafka/producer.js";
+import { connectProducer } from "../../src/infrastructure/kafka/producer.js";
 import { closeHoldExpiryQueue } from "../../src/infrastructure/queue/hold-expiry.queue.js";
 import { redisConnection } from "../../src/config/redis.js";
 import { closeDb } from "../../src/infrastructure/database/db.js";

@@ -41,15 +41,30 @@ app.addHook("onRequest", async (request, reply) => {
 
 app.addHook("onSend", securityHeaders);
 
-app.addHook("onRequest", async () => {
+app.addHook("onRequest", async (request) => {
   httpRequestsInFlight.inc();
+  // Fastify's onResponse only fires on reply.raw's 'finish'/'error' events
+  // (fastify/lib/reply.js's setupResponseListeners) -- if the client aborts
+  // before the response finishes writing, neither fires and onResponse never
+  // runs, permanently leaking this gauge upward. request.raw's 'close' event
+  // covers that gap, but it also fires on ordinary completed requests (after
+  // 'finish'), so both paths share the accountedFor flag to decrement exactly
+  // once regardless of which one wins -- mirrors lb-proxy's TrackedBody
+  // exactly-once-release pattern (lb-proxy/src/proxy.rs).
+  request.inFlightAccountedFor = false;
+  request.raw.once("close", () => {
+    if (!request.inFlightAccountedFor) {
+      request.inFlightAccountedFor = true;
+      httpRequestsInFlight.dec();
+    }
+  });
 });
 
-// onResponse runs on both the success and error paths (errorHandler just
-// sets the reply before onSend/onResponse still fire), so this is the one
-// place that reliably pairs with the onRequest increment above.
 app.addHook("onResponse", async (request, reply) => {
-  httpRequestsInFlight.dec();
+  if (!request.inFlightAccountedFor) {
+    request.inFlightAccountedFor = true;
+    httpRequestsInFlight.dec();
+  }
   // request.routeOptions.url is the declared route pattern (e.g.
   // "/bookings/reserve"), not the raw URL -- keeps label cardinality bounded
   // even if this app grows path params later. Requests that never matched a

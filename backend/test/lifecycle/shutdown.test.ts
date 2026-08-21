@@ -1,4 +1,4 @@
-import { after, before, describe, it } from "node:test";
+import { after, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import type { AddressInfo } from "node:net";
 import Fastify, { type FastifyInstance } from "fastify";
