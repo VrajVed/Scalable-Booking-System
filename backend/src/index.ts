@@ -11,7 +11,7 @@ import { startCdcConsumer, isCdcConsumerConnected } from "./infrastructure/kafka
 import { startHoldExpiryWorker } from "./infrastructure/queue/hold-expiry.worker.js";
 import { registerShutdownHandlers } from "./shutdown.js";
 import { redisConnection } from "./config/redis.js";
-import { registry, httpRequestDuration, httpRequestsInFlight } from "./shared/metrics/registry.js";
+import { registry, registerHttpMetricsHooks } from "./shared/metrics/registry.js";
 
 const app = Fastify({
   logger: {
@@ -41,41 +41,7 @@ app.addHook("onRequest", async (request, reply) => {
 
 app.addHook("onSend", securityHeaders);
 
-app.addHook("onRequest", async (request) => {
-  httpRequestsInFlight.inc();
-  // Fastify's onResponse only fires on reply.raw's 'finish'/'error' events
-  // (fastify/lib/reply.js's setupResponseListeners) -- if the client aborts
-  // before the response finishes writing, neither fires and onResponse never
-  // runs, permanently leaking this gauge upward. request.raw's 'close' event
-  // covers that gap, but it also fires on ordinary completed requests (after
-  // 'finish'), so both paths share the accountedFor flag to decrement exactly
-  // once regardless of which one wins -- mirrors lb-proxy's TrackedBody
-  // exactly-once-release pattern (lb-proxy/src/proxy.rs).
-  request.inFlightAccountedFor = false;
-  request.raw.once("close", () => {
-    if (!request.inFlightAccountedFor) {
-      request.inFlightAccountedFor = true;
-      httpRequestsInFlight.dec();
-    }
-  });
-});
-
-app.addHook("onResponse", async (request, reply) => {
-  if (!request.inFlightAccountedFor) {
-    request.inFlightAccountedFor = true;
-    httpRequestsInFlight.dec();
-  }
-  // request.routeOptions.url is the declared route pattern (e.g.
-  // "/bookings/reserve"), not the raw URL -- keeps label cardinality bounded
-  // even if this app grows path params later. Requests that never matched a
-  // route (404s, probes) fall back to a single "unmatched" bucket instead of
-  // one time series per garbage path.
-  const route = request.routeOptions?.url ?? "unmatched";
-  httpRequestDuration.observe(
-    { method: request.method, route, status_code: reply.statusCode },
-    reply.elapsedTime / 1000,
-  );
-});
+registerHttpMetricsHooks(app);
 
 app.get("/metrics", async (_request, reply) => {
   reply.header("Content-Type", registry.contentType);

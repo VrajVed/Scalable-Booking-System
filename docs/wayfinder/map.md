@@ -223,6 +223,15 @@ formal tickets, but the baseline this map builds on)*
   already-correct, not just assumed. 64/64 tests passing (dev-server-vs-test
   BullMQ contention reproduced again mid-verification, same root cause as
   earlier tonight — confirmed environment, not code, by rerunning isolated)
+- [In-flight-gauge regression test](tickets/0015-metrics-inflight-gauge-regression-test.md) —
+  ticket 0012's fix had no dedicated test (the one real gap in an otherwise
+  test-everything session). Extracted the onRequest/onResponse pair from
+  index.ts into an exported `registerHttpMetricsHooks()` so a test exercises
+  the *real* hooks, not a re-implementation that could drift; new
+  `test/shared/metrics.test.ts` proves a client-aborted request still
+  releases the gauge. Verified the test actually catches the bug: temporarily
+  neutered the fix, watched it fail (`1 !== 0`), restored it, watched it pass.
+  66/66 tests passing
 
 ## Not yet specified
 
