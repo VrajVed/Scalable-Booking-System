@@ -49,6 +49,23 @@ const envSchema = z.object({
   // empty/default signing secret would make every token forgeable.
   JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
   JWT_EXPIRES_IN: z.string().default("15m"),
+
+  // Origins allowed to call this API cross-origin (e.g. a Vite dev server on
+  // a different port than the backend). Explicit allowlist, not a wildcard
+  // -- this API issues Authorization: Bearer tokens the frontend attaches
+  // itself rather than relying on cookies, so a wildcard wouldn't expose
+  // credentials directly, but an explicit list still keeps the browser's
+  // CORS error surface meaningful (a typo'd/unexpected origin fails loudly)
+  // instead of silently allowing anything that asks.
+  CORS_ORIGINS: z
+    .string()
+    .default("http://localhost:5173")
+    .transform((v) =>
+      v
+        .split(",")
+        .map((origin) => origin.trim())
+        .filter((origin) => origin.length > 0),
+    ),
 });
 
 const parsed = envSchema.safeParse(process.env);

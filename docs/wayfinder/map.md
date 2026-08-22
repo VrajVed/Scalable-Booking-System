@@ -274,6 +274,14 @@ morning) rather than padding this map for its own sake.
   — "a small production system... just to impress the recruiters," not a
   real business. Keep scope calibrated accordingly: finish/polish existing
   surface area over speculative new subsystems, be token/time efficient.
+- [CORS, ahead of frontend](tickets/0018-cors-for-frontend.md) — backend had
+  zero CORS handling; a Vite dev frontend would have hit an opaque
+  browser-blocked error on its first request. `@fastify/cors` +
+  `CORS_ORIGINS` env var (explicit allowlist, not a wildcard), live-verified
+  with real preflight/actual requests from an allowed and a disallowed
+  origin. Backend is now functionally ready for the 3 core frontend pages
+  (auth, catalog browse, booking lifecycle) — **frontend work explicitly
+  not started yet, user said hold off**.
 
 ## Not yet specified
 

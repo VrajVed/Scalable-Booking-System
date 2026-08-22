@@ -1,4 +1,5 @@
 import Fastify from "fastify";
+import cors from "@fastify/cors";
 import { randomUUID } from "node:crypto";
 import { env } from "./config/env.js";
 import { errorHandler } from "./shared/middleware/errorHandler.js";
@@ -34,6 +35,20 @@ const app = Fastify({
 });
 
 app.setErrorHandler(errorHandler);
+
+// Registered before every hook/route below so the CORS headers (and
+// preflight OPTIONS handling) apply uniformly, including to error
+// responses -- a frontend on a different origin needs to actually read a
+// 401/429/500 body, not just a 2xx one.
+await app.register(cors, {
+  origin: env.CORS_ORIGINS,
+  // The frontend attaches its own Authorization: Bearer header rather than
+  // relying on cookies (ADR 0002's whole point is stateless JWT auth with
+  // no shared session store), so credentialed CORS (cookies/HTTP auth
+  // across origins) isn't needed here.
+  credentials: false,
+});
+
 app.addHook("preHandler", rateLimiter);
 
 app.addHook("onRequest", async (request, reply) => {

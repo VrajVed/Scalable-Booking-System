@@ -18,6 +18,7 @@
     "test": "tsx --env-file=.env --test test/**/*.test.ts"
   },
   "dependencies": {
+    "@fastify/cors": "^11.3.0",
     "bullmq": "^6.1.2",
     "drizzle-orm": "^0.45.1",
     "fastify": "^5.8.2",
