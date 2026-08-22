@@ -262,6 +262,19 @@ morning) rather than padding this map for its own sake.
   only syntax-checked + diff-confirmed identical to the verified one — no
   cluster tonight (RAM).
 
+- [Booking lifecycle routes](tickets/0017-booking-lifecycle-routes.md) —
+  the booking flow was one endpoint (`POST /bookings/reserve`) with no way to
+  discover a seatId, confirm, cancel, or view a booking. New `catalog` module
+  (`GET /events`, `GET /events/:id/seats`, public) + booking module gets
+  `GET /bookings`, `GET /bookings/:id`, `POST /bookings/:id/confirm` (the
+  simulated "Payment" step idea.md's flow always described but never had),
+  `POST /bookings/:id/cancel`. Two new race-free seat transitions
+  (`confirmSeatRow`, `releaseHeldOrBookedSeatRow`). 34 new tests, 88/88
+  passing. **User framing (2026-08-22)**: this is a resume/portfolio project
+  — "a small production system... just to impress the recruiters," not a
+  real business. Keep scope calibrated accordingly: finish/polish existing
+  surface area over speculative new subsystems, be token/time efficient.
+
 ## Not yet specified
 
 - Whether/how Prometheus+Grafana get wired into `k8s/` — deferred in ADR

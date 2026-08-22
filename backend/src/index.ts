@@ -6,6 +6,7 @@ import { rateLimiter } from "./shared/middleware/rateLimiter.js";
 import { securityHeaders } from "./shared/middleware/securityHeaders.js";
 import { bookingRoutes } from "./modules/booking/interface/booking.routes.js";
 import { authRoutes } from "./modules/auth/interface/auth.routes.js";
+import { catalogRoutes } from "./modules/catalog/interface/catalog.routes.js";
 import { connectProducer } from "./infrastructure/kafka/producer.js";
 import { startCdcConsumer, isCdcConsumerConnected } from "./infrastructure/kafka/cdc-consumer.js";
 import { startHoldExpiryWorker } from "./infrastructure/queue/hold-expiry.worker.js";
@@ -75,6 +76,7 @@ app.get("/health", async (request, reply) => {
 });
 
 app.register(bookingRoutes, { prefix: "/bookings" });
+app.register(catalogRoutes, { prefix: "/events" });
 app.register(authRoutes, { prefix: "/auth" });
 
 const start = async () => {
