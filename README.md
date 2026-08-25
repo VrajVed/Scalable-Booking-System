@@ -1,31 +1,38 @@
 # AI-Powered Scalable Booking System
 
-A scalable event-ticketing backend (Postgres → Debezium → Kafka → Node/Fastify → Redis)
-built to demonstrate distributed-systems fundamentals: CDC-driven cache invalidation,
-optimistic-concurrency seat reservation, and a Rust P2C load balancer in front of
-multiple backend instances. See `idea.md` for the pitch and `context.md` for full
-background — this file is just "how do I run it."
+A scalable event-ticketing system (Postgres → Debezium → Kafka → Node/Fastify → Redis,
+with a React web client) built to demonstrate distributed-systems fundamentals:
+CDC-driven cache invalidation *and* live UI updates, optimistic-concurrency seat
+reservation, and a Rust P2C load balancer in front of multiple backend instances. See
+`idea.md` for the pitch and `context.md` for full background — this file is just "how
+do I run it."
 
 ## Architecture
 
 ```
-         client
-           │
-           ▼
-    ┌─────────────┐
-    │  lb-proxy   │   Rust — P2C routing (router-core) + real-time
-    └──────┬──────┘   health-signal overrides, routes every request independently
-           │
-           ▼
-    booking-backend (× N)   Fastify + TypeScript, DDD/hexagonal, optimistic-
-           │                concurrency seat reservation
-           ▼
-    ┌──────────────────────────────────────────┐
-    │  Postgres ──► Debezium ──► Kafka          │
-    │                               │           │
-    │                               └──► CDC consumer ──► Redis
-    │                                    (cache invalidation, zero polling)
-    └──────────────────────────────────────────┘
+                        ┌──────────────┐
+                        │  web client  │   React + TS, browses events, picks
+                        └──────┬───────┘   seats, watches them update live
+                     HTTP + WS │
+                                ▼
+                        ┌─────────────┐
+                        │  lb-proxy   │   Rust — P2C routing (router-core) + real-time
+                        └──────┬──────┘   health-signal overrides, routes every request independently
+                                │
+                                ▼
+                  booking-backend (× N)   Fastify + TypeScript, DDD/hexagonal, optimistic-
+                        │                 concurrency seat reservation, WebSocket seat-map channel
+                        ▼
+    ┌──────────────────────────────────────────────────────────┐
+    │  Postgres ──► Debezium ──► Kafka                          │
+    │                               │                           │
+    │                               └──► CDC consumer ──► Redis (cache invalidation)
+    │                                          │                │
+    │                                          └──► WebSocket broadcast to any
+    │                                               connected client watching that
+    │                                               event's seat map — zero polling
+    │                                               end to end, DB write to browser
+    └──────────────────────────────────────────────────────────┘
 ```
 
 ## Status
@@ -34,7 +41,9 @@ Phase 1 (Kafka + CDC wired into the backend) and Phase 2 (Rust reverse-proxy LB)
 done and tested end-to-end. Phase 3 (k8s) manifests are in `k8s/` — kind/manifests
 for a full cluster with nginx ingress, HPA, and P2C lb-proxy. Phase 4 (load testing)
 is done: `load-test/` contains autocannon scripts (`reserve-auth-load-test.js`,
-`p2c-uniform.json`, etc.) and verified results.
+`p2c-uniform.json`, etc.) and verified results. Phase 5 (web client) is done:
+`frontend/` is a full React SPA covering the booking lifecycle end to end, with live
+seat-map updates pushed over the same CDC pipeline instead of polling.
 
 ## What's here
 
@@ -45,7 +54,11 @@ is done: `load-test/` contains autocannon scripts (`reserve-auth-load-test.js`,
 - `backend/` — Node.js + Fastify + TypeScript. DDD/hexagonal vertical slices.
   Booking module with optimistic-concurrency seat reservation flow, a Kafka producer
   for `booking.events`, and a Kafka consumer that maps Debezium's CDC envelope on the
-  `seats` table to Redis cache invalidation — zero polling.
+  `seats` table to Redis cache invalidation *and* a WebSocket broadcast to any client
+  watching that event's seat map — zero polling on either path.
+- `frontend/` — React + TypeScript SPA (Vite). Full booking lifecycle: browse events,
+  pick seats (multi-select, live status pushed over WebSocket), reserve, confirm/
+  cancel, view tickets. JWT auth against the backend, Tailwind for styling.
 - `router-core/` — vendored Rust library crate (P2C routing + ArcSwap scoreboard +
   safety overrides), 15 passing tests.
 - `lb-proxy/` — Rust reverse proxy wrapping router-core: routes each request via
@@ -56,6 +69,11 @@ is done: `load-test/` contains autocannon scripts (`reserve-auth-load-test.js`,
   scripts verified on real kind cluster.
 - `docs/adr/` — 3 accepted ADRs: 0001 (k8s headless backend), 0002 (local JWT auth
   instead of Clerk), 0003 (Prometheus + Grafana observability).
+
+## Tech stack
+
+Backend, Frontend, CDC pipeline, Kafka, Redis, Rust load balancer, Kubernetes,
+Prometheus/Grafana, WebSockets, JWT auth, PostgreSQL, Docker Compose.
 
 ## Running it
 
@@ -73,6 +91,15 @@ cd ../backend
 cp .env.example .env    # match ports to infra/.env if you changed them
 npm install
 npm run dev
+```
+
+For the web client:
+
+```bash
+cd frontend
+cp .env.example .env    # VITE_API_URL, defaults to http://localhost:3000
+npm install
+npm run dev              # http://localhost:5173
 ```
 
 Then:
@@ -102,7 +129,10 @@ curl -X POST http://localhost:3000/bookings/reserve \
 
 A second reservation attempt on the same seat returns `409 SEAT_UNAVAILABLE`. Watch
 the backend logs for `[kafka] invalidated cache seats:availability:event:<id>` — that
-line firing without any polling loop is the whole point of the CDC pipeline.
+line firing without any polling loop is the whole point of the CDC pipeline. The same
+CDC message also pushes over `GET /events/:id/live` (WebSocket) to any web client
+watching that event's seat map — open the seat picker in two browser tabs and reserve
+a seat in one to watch it grey out in the other, with no refresh.
 
 ## Rust load balancer
 

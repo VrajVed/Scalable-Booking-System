@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import websocket from "@fastify/websocket";
 import { randomUUID } from "node:crypto";
 import { env } from "./config/env.js";
 import { errorHandler } from "./shared/middleware/errorHandler.js";
@@ -48,6 +49,12 @@ await app.register(cors, {
   // across origins) isn't needed here.
   credentials: false,
 });
+
+// Backs the seat-picker's live-update channel (GET /events/:id/live) --
+// see catalog/interface/live.controller.ts and
+// infrastructure/realtime/seat-broadcaster.ts. Registered before the routes
+// that declare { websocket: true }.
+await app.register(websocket);
 
 app.addHook("preHandler", rateLimiter);
 

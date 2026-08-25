@@ -2,6 +2,10 @@ import type { Booking, EventSummary, Seat, SeatStatus, User } from "./types";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
+export function liveSeatsUrl(eventId: number) {
+  return `${API_URL.replace(/^http/, "ws")}/events/${eventId}/live`;
+}
+
 export class ApiError extends Error {
   code: string;
   status: number;
@@ -23,7 +27,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
     headers: {
-      "Content-Type": "application/json",
+      // Only set when there's an actual body -- Fastify's JSON parser
+      // rejects an empty body sent with this header (confirm/cancel POST
+      // with no body would otherwise 400 "Body cannot be empty...").
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
       ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
       ...init?.headers,
     },

@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { listEventsHandler, listSeatsForEventHandler } from "./catalog.controller.js";
+import { liveSeatsHandler } from "./live.controller.js";
 
 // Deliberately no requireAuth here -- browsing what's on sale doesn't
 // require a login on any real ticketing site, only reserving a seat does
@@ -7,4 +8,5 @@ import { listEventsHandler, listSeatsForEventHandler } from "./catalog.controlle
 export async function catalogRoutes(app: FastifyInstance) {
   app.get("/", listEventsHandler);
   app.get("/:eventId/seats", listSeatsForEventHandler);
+  app.get("/:eventId/live", { websocket: true }, liveSeatsHandler);
 }

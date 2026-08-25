@@ -6,6 +6,7 @@ import { CatalogPage } from "./pages/CatalogPage";
 import { EventDetailPage } from "./pages/EventDetailPage";
 import { SeatPickerPage } from "./pages/SeatPickerPage";
 import { CheckoutPage } from "./pages/CheckoutPage";
+import { MultiCheckoutPage } from "./pages/MultiCheckoutPage";
 import { TicketPage } from "./pages/TicketPage";
 import { BookingsListPage } from "./pages/BookingsListPage";
 import { BookingDetailPage } from "./pages/BookingDetailPage";
@@ -36,6 +37,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <BookingDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/checkout"
+            element={
+              <ProtectedRoute>
+                <MultiCheckoutPage />
               </ProtectedRoute>
             }
           />

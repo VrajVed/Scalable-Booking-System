@@ -3,6 +3,7 @@ import { env } from "../../config/env.js";
 import { redisConnection } from "../../config/redis.js";
 import { mapDebeziumMessage } from "./debezium-mapper.js";
 import { cdcConsumerConnected } from "../../shared/metrics/registry.js";
+import { broadcastSeatUpdate } from "../realtime/seat-broadcaster.js";
 
 // Consumes Debezium's CDC envelope for the seats table and invalidates the
 // per-event seat-availability cache key. This is the whole point of wiring
@@ -60,6 +61,23 @@ export async function handleCdcMessage(rawValue: Buffer | string | null | undefi
     const key = seatAvailabilityCacheKey(eventId);
     await redisConnection.del(key);
     console.log("[kafka] invalidated cache", key, event.type);
+
+    // Push the same change straight to any seat-picker tab watching this
+    // event -- same CDC message, no separate poll/refetch path. A seat row
+    // is never deleted in this schema, so DELETE (which wouldn't carry a
+    // meaningful status) is skipped; only INSERT/UPDATE matter here.
+    if (event.type !== "DELETE") {
+      const seatId = event.data.id;
+      const status = event.data.status;
+      const numericEventId = typeof eventId === "number" ? eventId : Number(eventId);
+      if (
+        typeof seatId === "number" &&
+        Number.isFinite(numericEventId) &&
+        (status === "available" || status === "held" || status === "booked")
+      ) {
+        broadcastSeatUpdate({ type: "seat.updated", seatId, eventId: numericEventId, status });
+      }
+    }
   } catch (err) {
     console.error("[kafka] failed to process cdc message", err);
   }
