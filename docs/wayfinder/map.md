@@ -283,6 +283,18 @@ morning) rather than padding this map for its own sake.
   (auth, catalog browse, booking lifecycle) — **frontend work explicitly
   not started yet, user said hold off**.
 
+- [Frontend built: all 11 pages](tickets/0019-frontend-page-scope.md) — auth,
+  home, catalog + city filter, event detail, seat picker, checkout, ticket/
+  confirmation, bookings list, booking detail, 404. React 19 + react-router +
+  Tailwind v4, light blue/cyan token system, no gradients/glows. Real-data
+  reality forced 2 mockup departures (no price field anywhere in the schema;
+  reserve is single-seat, not multi-seat). Found + fixed a real bug live:
+  a seed event has ~400k seats, `GET /events/:id/seats` had no pagination —
+  added an optional `limit` param (unbounded default, existing callers
+  unaffected). Live-verified the full HTTP flow with curl matching the
+  frontend's own calls; browser visual QA not done this session (Chrome
+  extension not connected).
+
 ## Not yet specified
 
 - Whether/how Prometheus+Grafana get wired into `k8s/` — deferred in ADR
@@ -300,6 +312,9 @@ morning) rather than padding this map for its own sake.
 - Pushing to the GitHub remote / resolving the unpushed `ab47712` commit —
   a repo-history decision for the human, not a code-fix ticket.
 - New kind clusters / k8s load tests tonight (2026-08-21/22) — RAM.
-- Frontend work — idea.md non-goal (API-first, thin demo at most).
+- ~~Frontend work — idea.md non-goal (API-first, thin demo at most).~~
+  **Superseded (2026-08-25)**: user decided to build a frontend after all.
+  Scaffold (Vite + React + TS + Tailwind v4) done in `frontend/`; page scope
+  decided — see ticket 0019.
 - Payment/notification services from idea.md's target architecture — in
   scope eventually, not started, not scoped for tonight.

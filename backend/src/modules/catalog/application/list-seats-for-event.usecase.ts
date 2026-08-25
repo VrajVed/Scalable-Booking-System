@@ -4,13 +4,14 @@ import { EventNotFoundError } from "../domain/catalog.errors.js";
 export interface ListSeatsForEventInput {
   eventId: number;
   status?: "available" | "held" | "booked" | undefined;
+  limit?: number | undefined;
 }
 
-export async function listSeatsForEvent({ eventId, status }: ListSeatsForEventInput) {
+export async function listSeatsForEvent({ eventId, status, limit }: ListSeatsForEventInput) {
   const event = await findEventById(eventId);
   if (!event) {
     throw new EventNotFoundError(eventId);
   }
 
-  return listSeatsForEventQuery(eventId, status);
+  return listSeatsForEventQuery(eventId, status, limit);
 }

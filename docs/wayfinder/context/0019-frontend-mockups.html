@@ -1,0 +1,586 @@
+<title>FlashSeat Screens</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+  :root {
+    --ink: #0c2233;
+    --paper: #f2f7fa;
+    --surface: #ffffff;
+    --surface-2: #e6eff4;
+    --text: #16303f;
+    --text-dim: #5c7686;
+    --line: #d7e4ea;
+    --line-strong: #b7cdd8;
+    --accent: #0072a8;
+    --accent-ink: #ffffff;
+    --accent2: #0f9d78;
+    --accent2-bg: #e2f7ef;
+    --danger: #c62a4f;
+    --danger-bg: #fbe6eb;
+    --shadow: 0 1px 2px rgba(12,34,51,0.05), 0 6px 16px -10px rgba(12,34,51,0.16);
+    --radius: 14px;
+    --font-display: "Archivo", "Arial Narrow", sans-serif;
+    --font-body: "Source Sans 3", "Segoe UI", sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; color: var(--ink); }
+  a { color: inherit; }
+  ::selection { background: var(--accent); color: var(--accent-ink); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .shell { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+
+  /* ---- rail ---- */
+  .rail {
+    position: sticky; top: 0; height: 100vh;
+    border-right: 1px solid var(--line);
+    padding: 28px 18px;
+    display: flex; flex-direction: column; gap: 22px;
+    overflow-y: auto;
+  }
+  .wordmark {
+    font-family: var(--font-display); font-weight: 800; font-size: 19px;
+    letter-spacing: -0.02em; color: var(--ink); display: flex; align-items: baseline; gap: 6px;
+  }
+  .wordmark .dot { color: var(--accent); font-size: 22px; line-height: 0; }
+  .rail-sub { font-size: 12px; color: var(--text-dim); margin-top: -14px; }
+  .rail nav { display: flex; flex-direction: column; gap: 2px; }
+  .rail nav a {
+    display: flex; align-items: baseline; gap: 10px;
+    text-decoration: none; padding: 7px 8px; border-radius: 8px;
+    font-size: 13px; color: var(--text-dim); transition: background .12s, color .12s;
+  }
+  .rail nav a:hover { background: var(--surface-2); color: var(--text); }
+  .rail nav a .idx { font-family: var(--font-mono); font-size: 11px; color: var(--accent); width: 16px; flex: none; }
+  .rail-group-label {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.09em;
+    color: var(--text-dim); margin: 14px 0 2px 8px; font-weight: 600;
+  }
+
+  /* ---- main ---- */
+  main { padding: 40px 48px 120px; max-width: 1180px; }
+  .intro { max-width: 640px; margin-bottom: 44px; }
+  .intro .eyebrow { font-family: var(--font-mono); font-size: 12px; color: var(--accent); letter-spacing: 0.04em; }
+  .intro h1 { font-size: 32px; margin-top: 6px; }
+  .intro p { color: var(--text-dim); margin-top: 10px; font-size: 15px; }
+
+  .screen { margin-bottom: 64px; scroll-margin-top: 24px; }
+  .screen-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+  .screen-head .idx { font-family: var(--font-mono); font-size: 13px; color: var(--accent); }
+  .screen-head h2 { font-size: 20px; }
+  .screen-head .route {
+    font-family: var(--font-mono); font-size: 11.5px; color: var(--text-dim);
+    background: var(--surface-2); padding: 2px 8px; border-radius: 6px; margin-left: auto;
+  }
+  .screen-note { font-size: 13px; color: var(--text-dim); margin: -6px 0 16px; max-width: 62ch; }
+
+  /* browser chrome frame */
+  .frame {
+    border: 1px solid var(--line); border-radius: 16px; overflow: hidden;
+    box-shadow: var(--shadow); background: var(--surface);
+  }
+  .frame-bar {
+    display: flex; align-items: center; gap: 6px; padding: 10px 14px;
+    background: var(--surface-2); border-bottom: 1px solid var(--line);
+  }
+  .frame-bar .knob { width: 9px; height: 9px; border-radius: 50%; background: var(--line-strong); }
+  .frame-bar .addr {
+    margin-left: 10px; font-family: var(--font-mono); font-size: 11px; color: var(--text-dim);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 3px 10px;
+  }
+  .frame-body { padding: 28px; background: var(--surface); }
+
+  /* shared bits */
+  .btn {
+    font-family: var(--font-body); font-weight: 600; font-size: 13.5px;
+    border: none; border-radius: 9px; padding: 10px 18px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn-primary { background: var(--accent); color: var(--accent-ink); }
+  .btn-ghost { background: transparent; border: 1px solid var(--line-strong); color: var(--text); }
+  .btn-danger-outline { background: transparent; border: 1px solid var(--danger); color: var(--danger); }
+  .pill {
+    font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 999px;
+    font-family: var(--font-mono); letter-spacing: 0.02em;
+  }
+  .pill-ok { background: var(--accent2-bg); color: var(--accent2); }
+  .pill-hold { background: var(--surface-2); color: var(--text-dim); }
+  .pill-danger { background: var(--danger-bg); color: var(--danger); }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 12px; color: var(--text-dim); }
+  .field input, .field select {
+    font-family: var(--font-body); font-size: 14px; padding: 9px 11px;
+    border: 1px solid var(--line-strong); border-radius: 8px; background: var(--paper); color: var(--text);
+  }
+  .topbar {
+    display: flex; align-items: center; gap: 18px; padding-bottom: 20px; margin-bottom: 24px;
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar .tb-links { display: flex; gap: 18px; font-size: 13px; color: var(--text-dim); margin-left: 10px; }
+  .topbar .spacer { flex: 1; }
+  .avatar {
+    width: 28px; height: 28px; border-radius: 50%; background: var(--surface-2);
+    display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--text-dim);
+  }
+  .price { font-family: var(--font-mono); font-weight: 600; }
+  .code { font-family: var(--font-mono); }
+
+  /* ===== 01 auth ===== */
+  .auth-wrap { max-width: 340px; margin: 0 auto; }
+  .auth-tabs { display: flex; gap: 4px; background: var(--surface-2); padding: 4px; border-radius: 10px; margin-bottom: 22px; }
+  .auth-tabs span { flex: 1; text-align: center; font-size: 13px; font-weight: 600; padding: 7px; border-radius: 7px; color: var(--text-dim); }
+  .auth-tabs span.active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+  .auth-wrap form { display: flex; flex-direction: column; gap: 14px; }
+  .auth-wrap .btn-primary { width: 100%; justify-content: center; margin-top: 4px; }
+
+  /* ===== 02 home ===== */
+  .hero { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 28px; align-items: center; margin-bottom: 34px; }
+  .hero h1 { font-size: 30px; line-height: 1.12; }
+  .hero p { color: var(--text-dim); margin-top: 10px; max-width: 40ch; }
+  .hero-search { display: flex; gap: 8px; margin-top: 18px; }
+  .hero-search input { flex: 1; }
+  .hero-art {
+    aspect-ratio: 4/3; border-radius: 14px; background: var(--surface-2);
+    background-image: repeating-linear-gradient(135deg, var(--line) 0 1px, transparent 1px 14px);
+    border: 1px solid var(--line); position: relative; overflow: hidden;
+  }
+  .hero-art::after {
+    content: "live tonight"; position: absolute; bottom: 14px; left: 14px;
+    font-family: var(--font-mono); font-size: 11px; color: var(--accent-ink);
+    background: var(--accent); padding: 4px 10px; border-radius: 999px;
+  }
+  .section-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); font-weight: 600; margin-bottom: 12px; }
+  .ev-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .ev-card { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--paper); }
+  .ev-card .art { aspect-ratio: 16/10; background: var(--surface-2); background-image: repeating-linear-gradient(135deg, var(--line) 0 1px, transparent 1px 12px); }
+  .ev-card .meta { padding: 12px; display: flex; flex-direction: column; gap: 4px; }
+  .ev-card .meta .name { font-weight: 700; font-size: 13.5px; }
+  .ev-card .meta .sub { font-size: 12px; color: var(--text-dim); }
+  .ev-card .meta .row { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
+
+  /* ===== 03 catalog + city filter ===== */
+  .catalog-toolbar { display: flex; gap: 10px; margin-bottom: 18px; align-items: center; }
+  .catalog-toolbar select { max-width: 160px; }
+  .city-chip {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600;
+    background: var(--accent2-bg); color: var(--accent2); padding: 6px 12px; border-radius: 999px;
+  }
+  .dropdown-pop {
+    position: relative;
+  }
+  .dropdown-pop .pop-panel {
+    position: absolute; top: calc(100% + 6px); left: 0; width: 200px; z-index: 2;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 6px;
+  }
+  .dropdown-pop .pop-panel .opt {
+    padding: 7px 10px; border-radius: 7px; font-size: 13px; display: flex; justify-content: space-between;
+  }
+  .dropdown-pop .pop-panel .opt.sel { background: var(--surface-2); color: var(--ink); font-weight: 600; }
+  .ev-grid.four { grid-template-columns: repeat(4, 1fr); }
+
+  /* ===== 04 event detail ===== */
+  .detail-grid { display: grid; grid-template-columns: 1fr 300px; gap: 28px; }
+  .detail-art { aspect-ratio: 21/9; border-radius: 14px; background: var(--surface-2); background-image: repeating-linear-gradient(135deg, var(--line) 0 1px, transparent 1px 16px); margin-bottom: 18px; }
+  .detail-title { font-size: 24px; margin-bottom: 6px; }
+  .detail-sub { color: var(--text-dim); font-size: 13.5px; display: flex; gap: 14px; flex-wrap: wrap; }
+  .detail-body p { color: var(--text-dim); font-size: 14px; max-width: 62ch; margin-top: 16px; }
+  .buy-card { border: 1px solid var(--line); border-radius: 14px; padding: 18px; height: fit-content; position: sticky; top: 24px; }
+  .buy-card .from { font-size: 11.5px; color: var(--text-dim); }
+  .buy-card .amount { font-size: 26px; font-family: var(--font-mono); font-weight: 600; margin: 4px 0 14px; }
+  .buy-card .btn-primary { width: 100%; justify-content: center; }
+  .buy-card .rows { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; font-size: 12.5px; color: var(--text-dim); }
+  .buy-card .rows div { display: flex; justify-content: space-between; }
+
+  /* ===== 05 seat picker ===== */
+  .seat-legend { display: flex; gap: 18px; margin-bottom: 20px; font-size: 12.5px; color: var(--text-dim); }
+  .seat-legend span { display: flex; align-items: center; gap: 6px; }
+  .swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+  .stage {
+    text-align: center; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em;
+    color: var(--text-dim); background: var(--surface-2); border-radius: 999px; padding: 8px 0; margin-bottom: 22px;
+  }
+  .seat-map { display: flex; flex-direction: column; gap: 8px; align-items: center; margin-bottom: 22px; }
+  .seat-row { display: flex; gap: 7px; align-items: center; }
+  .seat-row .rlabel { width: 16px; font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); text-align: right; margin-right: 4px; }
+  .seat {
+    width: 22px; height: 22px; border-radius: 5px; font-size: 0;
+    background: var(--surface-2); border: 1px solid var(--line-strong);
+  }
+  .seat.available { background: var(--paper); border-color: var(--accent2); }
+  .seat.held { background: var(--surface-2); border-color: var(--line); opacity: 0.5; }
+  .seat.selected { background: var(--accent); border-color: var(--accent); }
+  .seat-summary {
+    display: flex; justify-content: space-between; align-items: center;
+    border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; max-width: 520px; margin: 0 auto;
+  }
+  .seat-summary .picks { display: flex; gap: 6px; }
+  .seat-summary .picks .code { background: var(--accent); color: var(--accent-ink); padding: 3px 8px; border-radius: 6px; font-size: 12px; font-weight: 700; }
+
+  /* ===== 06 checkout ===== */
+  .checkout-grid { display: grid; grid-template-columns: 1fr 300px; gap: 28px; }
+  .co-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+  .co-row:last-child { border-bottom: none; }
+  .co-row .l { color: var(--text-dim); }
+  .co-total { display: flex; justify-content: space-between; padding-top: 14px; font-weight: 700; font-size: 16px; }
+  .co-summary { border: 1px solid var(--line); border-radius: 14px; padding: 18px; height: fit-content; }
+
+  /* ===== 07 ticket ===== */
+  .ticket { display: grid; grid-template-columns: 1fr 150px; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; max-width: 560px; margin: 0 auto; }
+  .ticket-main { padding: 22px; position: relative; }
+  .ticket-main .ok-badge { display: inline-flex; align-items: center; gap: 6px; color: var(--accent2); font-size: 12.5px; font-weight: 700; margin-bottom: 10px; }
+  .ticket-main h3 { font-size: 19px; }
+  .ticket-main .sub { color: var(--text-dim); font-size: 13px; margin-top: 4px; }
+  .ticket-main .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
+  .ticket-main .grid2 .k { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); }
+  .ticket-main .grid2 .v { font-family: var(--font-mono); font-size: 13px; margin-top: 2px; }
+  .ticket-stub {
+    background: var(--surface-2); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+    border-left: 1px dashed var(--line-strong); padding: 18px;
+  }
+  .qr { width: 84px; height: 84px; border-radius: 8px; background:
+    repeating-conic-gradient(var(--ink) 0% 25%, var(--surface) 0% 50%) 0 0/12px 12px; }
+  .ticket-stub .ref { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim); }
+
+  /* ===== 08 bookings list ===== */
+  .booking-row {
+    display: grid; grid-template-columns: 1fr auto auto auto; align-items: center; gap: 16px;
+    padding: 14px 4px; border-bottom: 1px solid var(--line);
+  }
+  .booking-row:last-child { border-bottom: none; }
+  .booking-row .ev-name { font-weight: 700; font-size: 13.5px; }
+  .booking-row .ev-sub { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+
+  /* ===== 09 booking detail ===== */
+  .bd-card { border: 1px solid var(--line); border-radius: 14px; padding: 22px; max-width: 480px; }
+  .bd-card .rows div { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+  .bd-card .rows div:last-child { border-bottom: none; }
+  .bd-actions { display: flex; gap: 10px; margin-top: 18px; }
+
+  /* ===== 11 404 ===== */
+  .nf-wrap { text-align: center; padding: 40px 0; }
+  .nf-wrap .code-big { font-family: var(--font-mono); font-size: 64px; font-weight: 600; color: var(--accent); letter-spacing: -0.02em; }
+  .nf-wrap p { color: var(--text-dim); margin: 8px 0 18px; }
+
+  @media (max-width: 880px) {
+    .shell { grid-template-columns: 1fr; }
+    .rail { position: relative; height: auto; }
+    .hero, .detail-grid, .checkout-grid { grid-template-columns: 1fr; }
+    .ev-grid, .ev-grid.four { grid-template-columns: repeat(2, 1fr); }
+    main { padding: 28px 20px 100px; }
+  }
+</style>
+
+<div class="shell">
+  <aside class="rail">
+    <div class="wordmark">FlashSeat<span class="dot">●</span></div>
+    <div class="rail-sub" style="margin-top:-16px;">11 screens, scoped in ticket 0019</div>
+    <nav>
+      <div class="rail-group-label">Core flow</div>
+      <a href="#s01"><span class="idx">01</span> Login / Register</a>
+      <a href="#s03"><span class="idx">03</span> Event catalog</a>
+      <a href="#s05"><span class="idx">05</span> Seat picker</a>
+      <a href="#s08"><span class="idx">08</span> My bookings</a>
+      <a href="#s09"><span class="idx">09</span> Booking detail</a>
+      <div class="rail-group-label">Added this round</div>
+      <a href="#s02"><span class="idx">02</span> Home / landing</a>
+      <a href="#s04"><span class="idx">04</span> Event detail</a>
+      <a href="#s10"><span class="idx">10</span> City filter</a>
+      <a href="#s06"><span class="idx">06</span> Checkout</a>
+      <a href="#s07"><span class="idx">07</span> Ticket / confirmation</a>
+      <a href="#s11"><span class="idx">11</span> 404</a>
+    </nav>
+  </aside>
+
+  <main>
+    <div class="intro">
+      <div class="eyebrow">TICKET 0019 — VISUAL PREVIEW</div>
+      <h1>Every FlashSeat screen, before a line of React</h1>
+      <p>Static mockups of all 11 scoped pages, in flow order. Real sample data (an event, seats, a booking) throughout — nothing built yet, this is the layout pass to react to before implementation starts.</p>
+    </div>
+
+    <!-- 01 AUTH -->
+    <section class="screen" id="s01">
+      <div class="screen-head"><span class="idx">01</span><h2>Login / Register</h2><span class="route">POST /auth/login · /auth/register</span></div>
+      <div class="frame">
+        <div class="frame-bar"><div class="knob"></div><div class="knob"></div><div class="knob"></div><div class="addr">flashseat.app/login</div></div>
+        <div class="frame-body">
+          <div class="auth-wrap">
+            <div class="auth-tabs"><span class="active">Log in</span><span>Register</span></div>
+            <form>
+              <div class="field"><label>Email</label><input value="vraj@example.com" readonly></div>
+              <div class="field"><label>Password</label><input type="password" value="········" readonly></div>
+              <button class="btn btn-primary" type="button">Log in</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 02 HOME -->
+    <section class="screen" id="s02">
+      <div class="screen-head"><span class="idx">02</span><h2>Home / landing</h2><span class="route">GET /events</span></div>
+      <p class="screen-note">Not scoped in a backend route of its own — reuses the events list, framed as a landing page instead of dropping straight into a bare table.</p>
+      <div class="frame">
+        <div class="frame-bar"><div class="knob"></div><div class="knob"></div><div class="knob"></div><div class="addr">flashseat.app/</div></div>
+        <div class="frame-body">
+          <div class="topbar">
+            <div class="wordmark" style="font-size:15px;">FlashSeat<span class="dot" style="font-size:16px;">●</span></div>
+            <div class="tb-links"><span>Browse</span><span>My bookings</span></div>
+            <div class="spacer"></div>
+            <div class="avatar">VV</div>
+          </div>
+          <div class="hero">
+            <div>
+              <h1>Tonight's stage is waiting.</h1>
+              <p>Find a seat before it's someone else's — live shows, real-time availability, held for 5 minutes while you decide.</p>
+              <div class="hero-search">
+                <input placeholder="Search events, artists, venues…">
+                <button class="btn btn-primary">Search</button>
+              </div>
+            </div>
+            <div class="hero-art"></div>
+          </div>
+          <div class="section-label">Upcoming</div>
+          <div class="ev-grid">
+            <div class="ev-card"><div class="art"></div><div class="meta"><div class="name">Arctic Monkeys</div><div class="sub">Wembley Arena · London</div><div class="row"><span class="sub">Fri, 12 Sep</span><span class="price">from ₹2,499</span></div></div></div>
+            <div class="ev-card"><div class="art"></div><div class="meta"><div class="name">Bonobo — Live</div><div class="sub">Warehouse 9 · Manchester</div><div class="row"><span class="sub">Sat, 20 Sep</span><span class="price">from ₹1,899</span></div></div></div>
+            <div class="ev-card"><div class="art"></div><div class="meta"><div class="name">Chennai Comedy Club</div><div class="sub">The Attic · Chennai</div><div class="row"><span class="sub">Sun, 21 Sep</span><span class="price">from ₹499</span></div></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 03 CATALOG -->
+    <section class="screen" id="s03">
+      <div class="screen-head"><span class="idx">03</span><h2>Event catalog</h2><span class="route">GET /events</span></div>
+      <div class="frame">
+        <div class="frame-bar"><div class="knob"></div><div class="knob"></div><div class="knob"></div><div class="addr">flashseat.app/events</div></div>
+        <div class="frame-body">
+          <div class="catalog-toolbar">
+            <h2 style="font-size:16px;">All events</h2>
+            <span style="flex:1;"></span>
+            <select><option>Sort: Soonest</option></select>
+            <select><option>Any city</option></select>
+          </div>
+          <div class="ev-grid four">
+            <div class="ev-card"><div class="art"></div><div class="meta"><div class="name">Arctic Monkeys</div><div class="sub">London</div></div></div>
+            <div class="ev-card"><div class="art"></div><div class="meta"><div class="name">Bonobo — Live</div><div class="sub">Manchester</div></div></div>
+            <div class="ev-card"><div class="art"></div><div class="meta"><div class="name">Chennai Comedy Club</div><div class="sub">Chennai</div></div></div>
+            <div class="ev-card"><div class="art"></div><div class="meta"><div class="name">Diwali Nights</div><div class="sub">Mumbai</div></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 04 EVENT DETAIL -->
+    <section class="screen" id="s04">
+      <div class="screen-head"><span class="idx">04</span><h2>Event detail</h2><span class="route">GET /events/:id</span></div>
+      <p class="screen-note">Split out of the catalog list so the "select seats" decision has its own screen instead of picking seats inline from a grid.</p>
+      <div class="frame">
+        <div class="frame-bar"><div class="knob"></div><div class="knob"></div><div class="knob"></div><div class="addr">flashseat.app/events/7</div></div>
+        <div class="frame-body">
+          <div class="detail-grid">
+            <div>
+              <div class="detail-art"></div>
+              <h1 class="detail-title">Arctic Monkeys</h1>
+              <div class="detail-sub"><span>Fri, 12 Sep · 7:30 PM</span><span>Wembley Arena, London</span><span class="pill pill-ok">142 seats left</span></div>
+              <div class="detail-body"><p>The world tour lands at Wembley for one night only. General admission and reserved seating both available — reserved holds your seat for 5 minutes at checkout.</p></div>
+            </div>
+            <div class="buy-card">
+              <div class="from">Tickets from</div>
+              <div class="amount">₹2,499</div>
+              <button class="btn btn-primary">Select seats</button>
+              <div class="rows"><div><span>Venue</span><span>Wembley Arena</span></div><div><span>Doors</span><span>6:45 PM</span></div><div><span>Status</span><span class="pill pill-ok">On sale</span></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 05 SEAT PICKER -->
+    <section class="screen" id="s05">
+      <div class="screen-head"><span class="idx">05</span><h2>Seat picker</h2><span class="route">GET /events/:id/seats</span></div>
+      <div class="frame">
+        <div class="frame-bar"><div class="knob"></div><div class="knob"></div><div class="knob"></div><div class="addr">flashseat.app/events/7/seats</div></div>
+        <div class="frame-body">
+          <div class="seat-legend">
+            <span><span class="swatch" style="background:var(--paper);border:1px solid var(--accent2);"></span>Available</span>
+            <span><span class="swatch" style="background:var(--accent);"></span>Selected</span>
+            <span><span class="swatch" style="background:var(--surface-2);opacity:.5;"></span>Held / booked</span>
+          </div>
+          <div class="stage">S T A G E</div>
+          <div class="seat-map">
+            <div class="seat-row"><span class="rlabel">A</span>
+              <div class="seat available"></div><div class="seat available"></div><div class="seat selected"></div><div class="seat selected"></div><div class="seat available"></div><div class="seat held"></div><div class="seat available"></div><div class="seat available"></div>
+            </div>
+            <div class="seat-row"><span class="rlabel">B</span>
+              <div class="seat available"></div><div class="seat held"></div><div class="seat held"></div><div class="seat available"></div><div class="seat available"></div><div class="seat available"></div><div class="seat available"></div><div class="seat held"></div>
+            </div>
+            <div class="seat-row"><span class="rlabel">C</span>
+              <div class="seat available"></div><div class="seat available"></div><div class="seat available"></div><div class="seat available"></div><div class="seat held"></div><div class="seat available"></div><div class="seat available"></div><div class="seat available"></div>
+            </div>
+          </div>
+          <div class="seat-summary">
+            <div><div style="font-size:12px;color:var(--text-dim);">Selected</div><div class="picks" style="margin-top:6px;"><span class="code">A12</span><span class="code">A13</span></div></div>
+            <div style="text-align:right;"><div class="price" style="font-size:17px;">₹4,998</div><button class="btn btn-primary" style="margin-top:6px;">Reserve seats</button></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 06 CHECKOUT -->
+    <section class="screen" id="s06">
+      <div class="screen-head"><span class="idx">06</span><h2>Checkout / order review</h2><span class="route">POST /bookings/:id/confirm</span></div>
+      <p class="screen-note">A review step in front of the existing confirm call — no new endpoint, just a pause before committing.</p>
+      <div class="frame">
+        <div class="frame-bar"><div class="knob"></div><div class="knob"></div><div class="knob"></div><div class="addr">flashseat.app/bookings/241/review</div></div>
+        <div class="frame-body">
+          <div class="checkout-grid">
+            <div>
+              <h2 style="font-size:16px;margin-bottom:14px;">Review your booking</h2>
+              <div class="co-row"><span class="l">Event</span><span>Arctic Monkeys — Wembley Arena</span></div>
+              <div class="co-row"><span class="l">Date</span><span>Fri, 12 Sep · 7:30 PM</span></div>
+              <div class="co-row"><span class="l">Seats</span><span class="code">A12, A13</span></div>
+              <div class="co-row"><span class="l">Hold expires</span><span class="pill pill-hold">4:42 remaining</span></div>
+            </div>
+            <div class="co-summary">
+              <div class="co-row"><span class="l">2 tickets</span><span class="price">₹4,998</span></div>
+              <div class="co-row"><span class="l">Service fee</span><span class="price">₹0</span></div>
+              <div class="co-total"><span>Total</span><span class="price">₹4,998</span></div>
+              <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:14px;">Confirm booking</button>
+              <button class="btn btn-ghost" style="width:100%;justify-content:center;margin-top:8px;">Release seats</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 07 TICKET -->
+    <section class="screen" id="s07">
+      <div class="screen-head"><span class="idx">07</span><h2>Ticket / confirmation</h2><span class="route">GET /bookings/:id</span></div>
+      <p class="screen-note">Client-generated QR from the booking id — no backend change.</p>
+      <div class="frame">
+        <div class="frame-bar"><div class="knob"></div><div class="knob"></div><div class="knob"></div><div class="addr">flashseat.app/bookings/241/ticket</div></div>
+        <div class="frame-body">
+          <div class="ticket">
+            <div class="ticket-main">
+              <div class="ok-badge">✓ Booking confirmed</div>
+              <h3>Arctic Monkeys</h3>
+              <div class="sub">Wembley Arena · Fri, 12 Sep · 7:30 PM</div>
+              <div class="grid2">
+                <div><div class="k">Seats</div><div class="v">A12, A13</div></div>
+                <div><div class="k">Total paid</div><div class="v">₹4,998</div></div>
+                <div><div class="k">Booking ref</div><div class="v">FS-8841-2X</div></div>
+                <div><div class="k">Holder</div><div class="v">V. Ved</div></div>
+              </div>
+            </div>
+            <div class="ticket-stub">
+              <div class="qr"></div>
+              <div class="ref">FS-8841-2X</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 08 MY BOOKINGS -->
+    <section class="screen" id="s08">
+      <div class="screen-head"><span class="idx">08</span><h2>My bookings</h2><span class="route">GET /bookings</span></div>
+      <div class="frame">
+        <div class="frame-bar"><div class="knob"></div><div class="knob"></div><div class="knob"></div><div class="addr">flashseat.app/bookings</div></div>
+        <div class="frame-body">
+          <h2 style="font-size:16px;margin-bottom:10px;">My bookings</h2>
+          <div class="booking-row">
+            <div><div class="ev-name">Arctic Monkeys</div><div class="ev-sub">Fri, 12 Sep · seats A12, A13</div></div>
+            <span class="pill pill-ok">confirmed</span><span class="price">₹4,998</span><button class="btn btn-ghost">View</button>
+          </div>
+          <div class="booking-row">
+            <div><div class="ev-name">Chennai Comedy Club</div><div class="ev-sub">Sun, 21 Sep · seat D4</div></div>
+            <span class="pill pill-hold">pending</span><span class="price">₹499</span><button class="btn btn-ghost">View</button>
+          </div>
+          <div class="booking-row">
+            <div><div class="ev-name">Diwali Nights</div><div class="ev-sub">12 Aug · seat B7</div></div>
+            <span class="pill pill-danger">cancelled</span><span class="price">₹1,299</span><button class="btn btn-ghost">View</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 09 BOOKING DETAIL -->
+    <section class="screen" id="s09">
+      <div class="screen-head"><span class="idx">09</span><h2>Booking detail</h2><span class="route">GET /bookings/:id · POST .../confirm · .../cancel</span></div>
+      <div class="frame">
+        <div class="frame-bar"><div class="knob"></div><div class="knob"></div><div class="knob"></div><div class="addr">flashseat.app/bookings/242</div></div>
+        <div class="frame-body">
+          <div class="bd-card">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px;"><h3 style="font-size:17px;">Chennai Comedy Club</h3><span class="pill pill-hold">pending</span></div>
+            <div class="rows">
+              <div><span>Seat</span><span class="code">D4</span></div>
+              <div><span>Date</span><span>Sun, 21 Sep · 8:00 PM</span></div>
+              <div><span>Amount</span><span class="price">₹499</span></div>
+              <div><span>Hold expires</span><span>4:12 remaining</span></div>
+            </div>
+            <div class="bd-actions">
+              <button class="btn btn-primary">Confirm booking</button>
+              <button class="btn btn-danger-outline">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 10 CITY FILTER -->
+    <section class="screen" id="s10">
+      <div class="screen-head"><span class="idx">10</span><h2>City filter</h2><span class="route">client-side, off venues.city</span></div>
+      <p class="screen-note">A state of the catalog screen, shown here with the filter open — no new endpoint, cities come from the events response already.</p>
+      <div class="frame">
+        <div class="frame-bar"><div class="knob"></div><div class="knob"></div><div class="knob"></div><div class="addr">flashseat.app/events?city=Chennai</div></div>
+        <div class="frame-body">
+          <div class="catalog-toolbar">
+            <h2 style="font-size:16px;">All events</h2>
+            <span style="flex:1;"></span>
+            <div class="dropdown-pop">
+              <span class="city-chip">Chennai ▾</span>
+              <div class="pop-panel">
+                <div class="opt">All cities</div>
+                <div class="opt sel">Chennai</div>
+                <div class="opt">London</div>
+                <div class="opt">Manchester</div>
+                <div class="opt">Mumbai</div>
+              </div>
+            </div>
+          </div>
+          <div class="ev-grid four">
+            <div class="ev-card"><div class="art"></div><div class="meta"><div class="name">Chennai Comedy Club</div><div class="sub">The Attic · Chennai</div></div></div>
+            <div class="ev-card"><div class="art"></div><div class="meta"><div class="name">Carnatic Fusion Night</div><div class="sub">Music Academy · Chennai</div></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 11 404 -->
+    <section class="screen" id="s11">
+      <div class="screen-head"><span class="idx">11</span><h2>404 / not found</h2><span class="route">client-side route</span></div>
+      <div class="frame">
+        <div class="frame-bar"><div class="knob"></div><div class="knob"></div><div class="knob"></div><div class="addr">flashseat.app/events/999</div></div>
+        <div class="frame-body">
+          <div class="nf-wrap">
+            <div class="code-big">404</div>
+            <p>This seat doesn't exist. The event may have ended or the link's wrong.</p>
+            <button class="btn btn-primary">Back to events</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>

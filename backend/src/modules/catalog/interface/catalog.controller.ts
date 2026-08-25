@@ -9,6 +9,7 @@ const eventIdParamSchema = z.object({
 
 const seatsQuerySchema = z.object({
   status: z.enum(["available", "held", "booked"]).optional(),
+  limit: z.coerce.number().int().positive().max(1000).optional(),
 });
 
 export async function listEventsHandler(_request: FastifyRequest, reply: FastifyReply) {
@@ -18,7 +19,7 @@ export async function listEventsHandler(_request: FastifyRequest, reply: Fastify
 
 export async function listSeatsForEventHandler(request: FastifyRequest, reply: FastifyReply) {
   const { eventId } = eventIdParamSchema.parse(request.params);
-  const { status } = seatsQuerySchema.parse(request.query);
-  const seatsList = await listSeatsForEvent({ eventId, status });
+  const { status, limit } = seatsQuerySchema.parse(request.query);
+  const seatsList = await listSeatsForEvent({ eventId, status, limit });
   return reply.status(200).send({ success: true, seats: seatsList });
 }

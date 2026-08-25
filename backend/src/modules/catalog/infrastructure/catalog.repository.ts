@@ -28,10 +28,18 @@ export async function findEventById(eventId: number) {
 
 // Uses idx_seats_event_status (see schema/seats.ts) -- this is the exact
 // (eventId, status) lookup that index exists for.
-export async function listSeatsForEvent(eventId: number, status?: "available" | "held" | "booked") {
-  return db
+//
+// limit is optional and defaults to unbounded (existing callers/tests keep
+// getting every row) -- added after a real event turned up with ~400k
+// seats (leftover load-test seed data): fetching and rendering all of them
+// isn't just a load-test-data quirk, it's a genuine scalability gap any
+// large real venue would also hit.
+export async function listSeatsForEvent(eventId: number, status?: "available" | "held" | "booked", limit?: number) {
+  const query = db
     .select()
     .from(seats)
     .where(status ? and(eq(seats.eventId, eventId), eq(seats.status, status)) : eq(seats.eventId, eventId))
     .orderBy(asc(seats.section), asc(seats.rowLabel), asc(seats.seatNumber));
+
+  return limit ? query.limit(limit) : query;
 }
